@@ -82,10 +82,25 @@ pub fn main() !void {
         .{ .name = "BCHG #2,D0", .opcode = 0x0840, .expected_op = .BCHG, .should_compile = true },
         .{ .name = "TAS D0", .opcode = 0x4AC0, .expected_op = .TAS, .should_compile = true },
         
-        // Program Control (3)
+        // Program Control (19) - Branch instructions
         .{ .name = "NOP", .opcode = 0x4E71, .expected_op = .NOP, .should_compile = true },
         .{ .name = "BRA +10", .opcode = 0x600A, .expected_op = .BRA, .should_compile = true },
         .{ .name = "BSR +20", .opcode = 0x6114, .expected_op = .BSR, .should_compile = true },
+        // Bcc - All 16 conditional branches (only testing decode, not execution)
+        .{ .name = "BHI +8", .opcode = 0x6208, .expected_op = .Bcc, .should_compile = true },
+        .{ .name = "BLS +8", .opcode = 0x6308, .expected_op = .Bcc, .should_compile = true },
+        .{ .name = "BCC +8", .opcode = 0x6408, .expected_op = .Bcc, .should_compile = true },
+        .{ .name = "BCS +8", .opcode = 0x6508, .expected_op = .Bcc, .should_compile = true },
+        .{ .name = "BNE +8", .opcode = 0x6608, .expected_op = .Bcc, .should_compile = true },
+        .{ .name = "BEQ +8", .opcode = 0x6708, .expected_op = .Bcc, .should_compile = true },
+        .{ .name = "BVC +8", .opcode = 0x6808, .expected_op = .Bcc, .should_compile = true },
+        .{ .name = "BVS +8", .opcode = 0x6908, .expected_op = .Bcc, .should_compile = true },
+        .{ .name = "BPL +8", .opcode = 0x6A08, .expected_op = .Bcc, .should_compile = true },
+        .{ .name = "BMI +8", .opcode = 0x6B08, .expected_op = .Bcc, .should_compile = true },
+        .{ .name = "BGE +8", .opcode = 0x6C08, .expected_op = .Bcc, .should_compile = true },
+        .{ .name = "BLT +8", .opcode = 0x6D08, .expected_op = .Bcc, .should_compile = true },
+        .{ .name = "BGT +8", .opcode = 0x6E08, .expected_op = .Bcc, .should_compile = true },
+        .{ .name = "BLE +8", .opcode = 0x6F08, .expected_op = .Bcc, .should_compile = true },
     };
     
     var passed: u32 = 0;
