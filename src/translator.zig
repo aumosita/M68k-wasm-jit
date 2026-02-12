@@ -1531,7 +1531,7 @@ pub const Translator = struct {
                 
                 // Set
                 try self.func.emitLocalGet(dst);
-                try self.func.emitI32Const(1 << @intCast(bit_num));
+                try self.func.emitI32Const(@as(i32, 1) << @as(u5, @intCast(bit_num)));
                 try self.func.emit(.i32_or);
                 try self.func.emitLocalSet(dst);
             }
@@ -1590,7 +1590,7 @@ pub const Translator = struct {
                 
                 // Clear
                 try self.func.emitLocalGet(dst);
-                try self.func.emitI32Const(~(@as(i32, 1) << @intCast(bit_num)));
+                try self.func.emitI32Const(~(@as(i32, 1) << @as(u5, @intCast(bit_num))));
                 try self.func.emit(.i32_and);
                 try self.func.emitLocalSet(dst);
             }
@@ -1647,7 +1647,7 @@ pub const Translator = struct {
                 
                 // Toggle
                 try self.func.emitLocalGet(dst);
-                try self.func.emitI32Const(1 << @intCast(bit_num));
+                try self.func.emitI32Const(@as(i32, 1) << @as(u5, @intCast(bit_num)));
                 try self.func.emit(.i32_xor);
                 try self.func.emitLocalSet(dst);
             }
