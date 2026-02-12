@@ -121,6 +121,10 @@ pub const Translator = struct {
             .SUBI => try self.translateSUBI(instr),
             .SUBQ => try self.translateSUBQ(instr),
             .SUBX => try self.translateSUBX(instr),
+            .MULS => try self.translateMULS(instr),
+            .MULU => try self.translateMULU(instr),
+            .DIVS => try self.translateDIVS(instr),
+            .DIVU => try self.translateDIVU(instr),
             .CLR => try self.translateCLR(instr),
             .NEG => try self.translateNEG(instr),
             .NEGX => try self.translateNEGX(instr),
@@ -616,6 +620,178 @@ pub const Translator = struct {
         } else {
             return error.UnsupportedEAMode;
         }
+    }
+    
+    /// MULS - Signed multiply (16-bit → 32-bit)
+    fn translateMULS(self: *Translator, instr: Instruction) !void {
+        // MULS <ea>, Dn
+        // Dn(32-bit) = Dn(low 16-bit) * src(16-bit) (signed)
+        
+        const dst = Reg.dataReg(instr.dst_reg);
+        
+        // Load source (16-bit)
+        try self.loadEA(instr.src_mode, instr.src_reg, .Word);
+        
+        // Sign-extend source to 32-bit
+        try self.func.emitI32Const(16);
+        try self.func.emit(.i32_shl);
+        try self.func.emitI32Const(16);
+        try self.func.emit(.i32_shr_s);
+        
+        // Get low 16 bits of Dn and sign-extend
+        try self.func.emitLocalGet(dst);
+        try self.func.emitI32Const(16);
+        try self.func.emit(.i32_shl);
+        try self.func.emitI32Const(16);
+        try self.func.emit(.i32_shr_s);
+        
+        // Multiply (signed)
+        try self.func.emit(.i32_mul);
+        try self.func.emitLocalSet(dst);
+        
+        try self.updateFlagsNZ(dst);
+        
+        // V = 0, C = 0 (always for MUL)
+        try self.func.emitI32Const(0);
+        try self.func.emitLocalSet(Reg.FLAG_V);
+        try self.func.emitI32Const(0);
+        try self.func.emitLocalSet(Reg.FLAG_C);
+    }
+    
+    /// MULU - Unsigned multiply (16-bit → 32-bit)
+    fn translateMULU(self: *Translator, instr: Instruction) !void {
+        // MULU <ea>, Dn
+        // Dn(32-bit) = Dn(low 16-bit) * src(16-bit) (unsigned)
+        
+        const dst = Reg.dataReg(instr.dst_reg);
+        
+        // Load source (16-bit)
+        try self.loadEA(instr.src_mode, instr.src_reg, .Word);
+        
+        // Zero-extend source to 32-bit (mask to 16 bits)
+        try self.func.emitI32Const(0xFFFF);
+        try self.func.emit(.i32_and);
+        
+        // Get low 16 bits of Dn and zero-extend
+        try self.func.emitLocalGet(dst);
+        try self.func.emitI32Const(0xFFFF);
+        try self.func.emit(.i32_and);
+        
+        // Multiply (unsigned - same as signed for low 32 bits)
+        try self.func.emit(.i32_mul);
+        try self.func.emitLocalSet(dst);
+        
+        try self.updateFlagsNZ(dst);
+        
+        try self.func.emitI32Const(0);
+        try self.func.emitLocalSet(Reg.FLAG_V);
+        try self.func.emitI32Const(0);
+        try self.func.emitLocalSet(Reg.FLAG_C);
+    }
+    
+    /// DIVS - Signed divide (32-bit / 16-bit)
+    fn translateDIVS(self: *Translator, instr: Instruction) !void {
+        // DIVS <ea>, Dn
+        // Dn(low 16) = Dn(32) / src(16) (quotient)
+        // Dn(high 16) = Dn(32) % src(16) (remainder)
+        
+        const dst = Reg.dataReg(instr.dst_reg);
+        
+        // Load divisor (16-bit)
+        try self.loadEA(instr.src_mode, instr.src_reg, .Word);
+        
+        // Sign-extend divisor
+        try self.func.emitI32Const(16);
+        try self.func.emit(.i32_shl);
+        try self.func.emitI32Const(16);
+        try self.func.emit(.i32_shr_s);
+        const divisor = try self.func.addLocal(.i32);
+        try self.func.emitLocalSet(divisor);
+        
+        // Check for divide by zero
+        // TODO: Should trigger exception
+        
+        // Quotient = Dn / divisor (signed)
+        try self.func.emitLocalGet(dst);
+        try self.func.emitLocalGet(divisor);
+        try self.func.emit(.i32_div_s);
+        const quotient = try self.func.addLocal(.i32);
+        try self.func.emitLocalSet(quotient);
+        
+        // Remainder = Dn % divisor (signed)
+        try self.func.emitLocalGet(dst);
+        try self.func.emitLocalGet(divisor);
+        try self.func.emit(.i32_rem_s);
+        const remainder = try self.func.addLocal(.i32);
+        try self.func.emitLocalSet(remainder);
+        
+        // Pack result: (remainder << 16) | (quotient & 0xFFFF)
+        try self.func.emitLocalGet(remainder);
+        try self.func.emitI32Const(16);
+        try self.func.emit(.i32_shl);
+        try self.func.emitLocalGet(quotient);
+        try self.func.emitI32Const(0xFFFF);
+        try self.func.emit(.i32_and);
+        try self.func.emit(.i32_or);
+        try self.func.emitLocalSet(dst);
+        
+        // Update flags based on quotient
+        try self.updateFlagsNZ(quotient);
+        
+        // V = overflow (quotient doesn't fit in 16 bits)
+        // C = 0 (always)
+        try self.func.emitI32Const(0);
+        try self.func.emitLocalSet(Reg.FLAG_V);
+        try self.func.emitI32Const(0);
+        try self.func.emitLocalSet(Reg.FLAG_C);
+    }
+    
+    /// DIVU - Unsigned divide (32-bit / 16-bit)
+    fn translateDIVU(self: *Translator, instr: Instruction) !void {
+        // DIVU <ea>, Dn
+        // Similar to DIVS but unsigned
+        
+        const dst = Reg.dataReg(instr.dst_reg);
+        
+        // Load divisor (16-bit)
+        try self.loadEA(instr.src_mode, instr.src_reg, .Word);
+        
+        // Zero-extend divisor
+        try self.func.emitI32Const(0xFFFF);
+        try self.func.emit(.i32_and);
+        const divisor = try self.func.addLocal(.i32);
+        try self.func.emitLocalSet(divisor);
+        
+        // Quotient = Dn / divisor (unsigned)
+        try self.func.emitLocalGet(dst);
+        try self.func.emitLocalGet(divisor);
+        try self.func.emit(.i32_div_u);
+        const quotient = try self.func.addLocal(.i32);
+        try self.func.emitLocalSet(quotient);
+        
+        // Remainder = Dn % divisor (unsigned)
+        try self.func.emitLocalGet(dst);
+        try self.func.emitLocalGet(divisor);
+        try self.func.emit(.i32_rem_u);
+        const remainder = try self.func.addLocal(.i32);
+        try self.func.emitLocalSet(remainder);
+        
+        // Pack result
+        try self.func.emitLocalGet(remainder);
+        try self.func.emitI32Const(16);
+        try self.func.emit(.i32_shl);
+        try self.func.emitLocalGet(quotient);
+        try self.func.emitI32Const(0xFFFF);
+        try self.func.emit(.i32_and);
+        try self.func.emit(.i32_or);
+        try self.func.emitLocalSet(dst);
+        
+        try self.updateFlagsNZ(quotient);
+        
+        try self.func.emitI32Const(0);
+        try self.func.emitLocalSet(Reg.FLAG_V);
+        try self.func.emitI32Const(0);
+        try self.func.emitLocalSet(Reg.FLAG_C);
     }
     
     /// CLR - Clear operand (set to zero)
