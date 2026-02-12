@@ -299,16 +299,41 @@ pub const Decoder = struct {
     fn decodeGroup4(opcode: u16) Instruction {
         // Group 4: Miscellaneous instructions
         
-        // LEA: 0100xxx111xxxxxx
-        if (((opcode >> 6) & 0x3F) == 0x39) {
+        // NOP: 0100111001110001 (가장 구체적인 패턴 먼저)
+        if (opcode == 0x4E71) {
+            return makeNOP();
+        }
+        
+        // RTS: 0100111001110101
+        if (opcode == 0x4E75) {
             return .{
-                .op = .LEA,
-                .size = .Long,
-                .src_mode = @enumFromInt(@as(u3, @truncate((opcode >> 3) & 0x7))),
+                .op = .RTS,
+                .size = .Word,
+                .src_mode = .DataRegDirect,
+                .src_reg = 0,
+                .src_imm = null,
+                .dst_mode = .DataRegDirect,
+                .dst_reg = 0,
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 2,
+            };
+        }
+        
+        // SWAP: 0100100001000xxx
+        if ((opcode & 0xFFF8) == 0x4840) {
+            return .{
+                .op = .SWAP,
+                .size = .Word,
+                .src_mode = .DataRegDirect,
                 .src_reg = @as(u3, @truncate(opcode & 0x7)),
                 .src_imm = null,
-                .dst_mode = .AddrRegDirect,
-                .dst_reg = @as(u3, @truncate((opcode >> 9) & 0x7)),
+                .dst_mode = .DataRegDirect,
+                .dst_reg = @as(u3, @truncate(opcode & 0x7)),
                 .dst_imm = null,
                 .disp = null,
                 .condition = 0,
@@ -339,16 +364,16 @@ pub const Decoder = struct {
             };
         }
         
-        // SWAP: 0100100001000xxx
-        if ((opcode & 0xFFF8) == 0x4840) {
+        // LEA: 0100xxx111xxxxxx
+        if (((opcode >> 6) & 0x3F) == 0x39) {
             return .{
-                .op = .SWAP,
-                .size = .Word,
-                .src_mode = .DataRegDirect,
+                .op = .LEA,
+                .size = .Long,
+                .src_mode = @enumFromInt(@as(u3, @truncate((opcode >> 3) & 0x7))),
                 .src_reg = @as(u3, @truncate(opcode & 0x7)),
                 .src_imm = null,
-                .dst_mode = .DataRegDirect,
-                .dst_reg = @as(u3, @truncate(opcode & 0x7)),
+                .dst_mode = .AddrRegDirect,
+                .dst_reg = @as(u3, @truncate((opcode >> 9) & 0x7)),
                 .dst_imm = null,
                 .disp = null,
                 .condition = 0,
@@ -392,26 +417,6 @@ pub const Decoder = struct {
                 .src_imm = null,
                 .dst_mode = .DataRegDirect,
                 .dst_reg = @as(u3, @truncate(opcode & 0x7)),
-                .dst_imm = null,
-                .disp = null,
-                .condition = 0,
-                .reg_mask = 0,
-                .bf_offset = 0,
-                .bf_width = 0,
-                .length = 2,
-            };
-        }
-        
-        // RTS: 0100111001110101
-        if (opcode == 0x4E75) {
-            return .{
-                .op = .RTS,
-                .size = .Word,
-                .src_mode = .DataRegDirect,
-                .src_reg = 0,
-                .src_imm = null,
-                .dst_mode = .DataRegDirect,
-                .dst_reg = 0,
                 .dst_imm = null,
                 .disp = null,
                 .condition = 0,

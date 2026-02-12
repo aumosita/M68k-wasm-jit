@@ -102,6 +102,11 @@ pub const Translator = struct {
         switch (instr.op) {
             .MOVEQ => try self.translateMOVEQ(instr),
             .MOVE => try self.translateMOVE(instr),
+            .LEA => try self.translateLEA(instr),
+            .PEA => try self.translatePEA(instr),
+            .EXG => try self.translateEXG(instr),
+            .SWAP => try self.translateSWAP(instr),
+            .EXT => try self.translateEXT(instr),
             .ADD => try self.translateADD(instr),
             .SUB => try self.translateSUB(instr),
             .AND => try self.translateAND(instr),
@@ -569,6 +574,148 @@ pub const Translator = struct {
         try self.func.emitI32Const(4);
         try self.func.emit(.i32_add);
         try self.func.emitLocalSet(Reg.A7);
+    }
+    
+    /// LEA - Load Effective Address
+    fn translateLEA(self: *Translator, instr: Instruction) !void {
+        // LEA <ea>, An
+        // Calculate EA address and store in An
+        const dst = Reg.addrReg(instr.dst_reg);
+        
+        // Calculate effective address
+        try self.calculateEA(instr.src_mode, instr.src_reg);
+        
+        // Store to address register
+        try self.func.emitLocalSet(dst);
+    }
+    
+    /// PEA - Push Effective Address
+    fn translatePEA(self: *Translator, instr: Instruction) !void {
+        // PEA <ea>
+        // Calculate EA and push to stack
+        
+        // A7 -= 4
+        try self.func.emitLocalGet(Reg.A7);
+        try self.func.emitI32Const(-4);
+        try self.func.emit(.i32_add);
+        try self.func.emitLocalSet(Reg.A7);
+        
+        // Calculate EA
+        try self.calculateEA(instr.src_mode, instr.src_reg);
+        
+        // Store to (A7)
+        try self.func.emitLocalGet(Reg.A7);
+        // Stack: [ea_addr, sp]
+        // Need: [sp, ea_addr] for i32.store
+        try self.func.emit(.i32_store);
+    }
+    
+    /// EXG - Exchange registers
+    fn translateEXG(self: *Translator, instr: Instruction) !void {
+        // EXG Rx, Ry
+        const src = if (instr.src_mode == .DataRegDirect) 
+            Reg.dataReg(instr.src_reg)
+        else
+            Reg.addrReg(instr.src_reg);
+            
+        const dst = if (instr.dst_mode == .DataRegDirect)
+            Reg.dataReg(instr.dst_reg)
+        else
+            Reg.addrReg(instr.dst_reg);
+        
+        // temp = src
+        try self.func.emitLocalGet(src);
+        const temp = try self.func.addLocal(.i32);
+        try self.func.emitLocalSet(temp);
+        
+        // src = dst
+        try self.func.emitLocalGet(dst);
+        try self.func.emitLocalSet(src);
+        
+        // dst = temp
+        try self.func.emitLocalGet(temp);
+        try self.func.emitLocalSet(dst);
+    }
+    
+    /// SWAP - Swap register halves
+    fn translateSWAP(self: *Translator, instr: Instruction) !void {
+        // SWAP Dn
+        // Swap upper and lower 16 bits
+        const dn = Reg.dataReg(instr.dst_reg);
+        
+        // value = Dn
+        try self.func.emitLocalGet(dn);
+        
+        // lower = value & 0xFFFF
+        try self.func.emitLocalGet(dn);
+        try self.func.emitI32Const(0xFFFF);
+        try self.func.emit(.i32_and);
+        
+        // upper = (value >> 16) & 0xFFFF
+        try self.func.emitLocalGet(dn);
+        try self.func.emitI32Const(16);
+        try self.func.emit(.i32_shr_u);
+        
+        // result = (lower << 16) | upper
+        try self.func.emitI32Const(16);
+        try self.func.emit(.i32_shl);
+        try self.func.emit(.i32_or);
+        
+        // Dn = result
+        try self.func.emitLocalSet(dn);
+        
+        // Update flags
+        try self.updateFlagsNZ(dn);
+    }
+    
+    /// EXT - Sign extend
+    fn translateEXT(self: *Translator, instr: Instruction) !void {
+        // EXT.W Dn (byte to word)
+        // EXT.L Dn (word to long)
+        const dn = Reg.dataReg(instr.dst_reg);
+        
+        if (instr.size == .Word) {
+            // Byte to word: sign extend bit 7 to bits 8-15
+            try self.func.emitLocalGet(dn);
+            try self.func.emitI32Const(24);
+            try self.func.emit(.i32_shl);
+            try self.func.emitI32Const(24);
+            try self.func.emit(.i32_shr_s);
+        } else {
+            // Word to long: sign extend bit 15 to bits 16-31
+            try self.func.emitLocalGet(dn);
+            try self.func.emitI32Const(16);
+            try self.func.emit(.i32_shl);
+            try self.func.emitI32Const(16);
+            try self.func.emit(.i32_shr_s);
+        }
+        
+        try self.func.emitLocalSet(dn);
+        
+        // Update flags
+        try self.updateFlagsNZ(dn);
+    }
+    
+    /// Calculate effective address (not load value)
+    fn calculateEA(self: *Translator, mode: @import("decoder.zig").EAMode, reg: u3) !void {
+        switch (mode) {
+            .AddrRegIndirect => {
+                // Address is just An
+                try self.func.emitLocalGet(Reg.addrReg(reg));
+            },
+            .AddrRegDisp => {
+                // Address is An + displacement
+                // TODO: need to read displacement from instruction stream
+                try self.func.emitLocalGet(Reg.addrReg(reg));
+            },
+            .AbsShort, .AbsLong => {
+                // TODO: read absolute address from instruction
+                try self.func.emitI32Const(0); // placeholder
+            },
+            else => {
+                return error.UnsupportedEAModeForLEA;
+            },
+        }
     }
     
     /// Update N and Z flags based on result

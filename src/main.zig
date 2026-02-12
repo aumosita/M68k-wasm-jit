@@ -18,9 +18,7 @@ pub fn main() !void {
         0x70, 0x42, // MOVEQ #42, D0
         0x72, 0x14, // MOVEQ #20, D1
         0xD0, 0x81, // ADD.L D1, D0  → D0 = 62
-        0xC0, 0x81, // AND.L D1, D0  → D0 = 20
-        0x60, 0x04, // BNE +4        → Skip if Z=0
-        0x70, 0x00, // MOVEQ #0, D0  → (skipped)
+        0x48, 0x40, // SWAP D0       → swap halves
         0x4E, 0x71, // NOP
     };
     
