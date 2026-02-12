@@ -125,6 +125,8 @@ pub const Translator = struct {
             .MULU => try self.translateMULU(instr),
             .DIVS => try self.translateDIVS(instr),
             .DIVU => try self.translateDIVU(instr),
+            .DIVSL => try self.translateDIVSL(instr),
+            .DIVUL => try self.translateDIVUL(instr),
             .CLR => try self.translateCLR(instr),
             .NEG => try self.translateNEG(instr),
             .NEGX => try self.translateNEGX(instr),
@@ -787,6 +789,65 @@ pub const Translator = struct {
         try self.func.emitLocalSet(dst);
         
         try self.updateFlagsNZ(quotient);
+        
+        try self.func.emitI32Const(0);
+        try self.func.emitLocalSet(Reg.FLAG_V);
+        try self.func.emitI32Const(0);
+        try self.func.emitLocalSet(Reg.FLAG_C);
+    }
+    
+    /// DIVSL - Signed divide long (68020)
+    fn translateDIVSL(self: *Translator, instr: Instruction) !void {
+        // DIVSL.L <ea>, Dq (quotient only)
+        // DIVSL.L <ea>, Dr:Dq (64-bit dividend)
+        // 68020 specific - 64-bit / 32-bit → 32-bit quotient
+        
+        // Simplified: treat as 32-bit / 32-bit for now
+        // TODO: Implement proper 64-bit dividend handling
+        
+        const dst = Reg.dataReg(instr.dst_reg);
+        
+        // Load divisor (32-bit)
+        try self.loadEA(instr.src_mode, instr.src_reg, .Long);
+        const divisor = try self.func.addLocal(.i32);
+        try self.func.emitLocalSet(divisor);
+        
+        // Quotient = Dn / divisor (signed)
+        try self.func.emitLocalGet(dst);
+        try self.func.emitLocalGet(divisor);
+        try self.func.emit(.i32_div_s);
+        try self.func.emitLocalSet(dst);
+        
+        try self.updateFlagsNZ(dst);
+        
+        try self.func.emitI32Const(0);
+        try self.func.emitLocalSet(Reg.FLAG_V);
+        try self.func.emitI32Const(0);
+        try self.func.emitLocalSet(Reg.FLAG_C);
+    }
+    
+    /// DIVUL - Unsigned divide long (68020)
+    fn translateDIVUL(self: *Translator, instr: Instruction) !void {
+        // DIVUL.L <ea>, Dq (quotient only)
+        // DIVUL.L <ea>, Dr:Dq (64-bit dividend)
+        // 68020 specific - 64-bit / 32-bit → 32-bit quotient
+        
+        // Simplified: treat as 32-bit / 32-bit for now
+        
+        const dst = Reg.dataReg(instr.dst_reg);
+        
+        // Load divisor (32-bit)
+        try self.loadEA(instr.src_mode, instr.src_reg, .Long);
+        const divisor = try self.func.addLocal(.i32);
+        try self.func.emitLocalSet(divisor);
+        
+        // Quotient = Dn / divisor (unsigned)
+        try self.func.emitLocalGet(dst);
+        try self.func.emitLocalGet(divisor);
+        try self.func.emit(.i32_div_u);
+        try self.func.emitLocalSet(dst);
+        
+        try self.updateFlagsNZ(dst);
         
         try self.func.emitI32Const(0);
         try self.func.emitLocalSet(Reg.FLAG_V);
