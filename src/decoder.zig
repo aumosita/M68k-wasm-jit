@@ -689,8 +689,15 @@ pub const Decoder = struct {
         const condition = @as(u4, @truncate((opcode >> 8) & 0xF));
         const disp8 = @as(i8, @bitCast(@as(u8, @truncate(opcode & 0xFF))));
         
+        // Determine operation
+        const op: Operation = switch (condition) {
+            0 => .BRA,  // Branch always
+            1 => .BSR,  // Branch to subroutine
+            else => .Bcc,  // Conditional branch
+        };
+        
         return .{
-            .op = if (condition == 0) .BRA else .Bcc,
+            .op = op,
             .size = .Byte,
             .src_mode = .DataRegDirect,
             .src_reg = 0,
@@ -703,7 +710,7 @@ pub const Decoder = struct {
             .reg_mask = 0,
             .bf_offset = 0,
             .bf_width = 0,
-            .length = 2,
+            .length = if (disp8 == 0) @as(u8, 4) else 2,  // 0 means 16-bit displacement follows
         };
     }
     

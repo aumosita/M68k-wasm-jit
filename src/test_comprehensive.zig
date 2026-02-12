@@ -82,8 +82,10 @@ pub fn main() !void {
         .{ .name = "BCHG #2,D0", .opcode = 0x0840, .expected_op = .BCHG, .should_compile = true },
         .{ .name = "TAS D0", .opcode = 0x4AC0, .expected_op = .TAS, .should_compile = true },
         
-        // Program Control
+        // Program Control (3)
         .{ .name = "NOP", .opcode = 0x4E71, .expected_op = .NOP, .should_compile = true },
+        .{ .name = "BRA +10", .opcode = 0x600A, .expected_op = .BRA, .should_compile = true },
+        .{ .name = "BSR +20", .opcode = 0x6114, .expected_op = .BSR, .should_compile = true },
     };
     
     var passed: u32 = 0;

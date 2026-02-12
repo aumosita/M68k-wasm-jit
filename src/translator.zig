@@ -157,6 +157,7 @@ pub const Translator = struct {
             .TAS => try self.translateTAS(instr),
             .NOP => try self.translateNOP(instr),
             .BRA => try self.translateBRA(instr),
+            .BSR => try self.translateBSR(instr),
             .Bcc => try self.translateBcc(instr),
             .JSR => try self.translateJSR(instr),
             .RTS => try self.translateRTS(instr),
@@ -1724,6 +1725,38 @@ pub const Translator = struct {
         try self.func.emitLocalSet(Reg.PC);
         
         // TODO: Actual branch (needs block/loop structure)
+    }
+    
+    /// BSR → Branch to subroutine (push return address, then branch)
+    fn translateBSR(self: *Translator, instr: Instruction) !void {
+        // BSR displacement
+        // 1. Push return address (PC + 2) to stack
+        // 2. Update PC: PC = PC + 2 + displacement
+        const disp = instr.disp orelse 0;
+        
+        // Return address = PC + 2
+        try self.func.emitLocalGet(Reg.PC);
+        try self.func.emitI32Const(2);
+        try self.func.emit(.i32_add);
+        
+        // Push to stack: SP -= 4, *(SP) = return_addr
+        // SP -= 4
+        try self.func.emitLocalGet(Reg.A7);  // A7 = Stack Pointer
+        try self.func.emitI32Const(4);
+        try self.func.emit(.i32_sub);
+        try self.func.emitLocalSet(Reg.A7);
+        
+        // Store return address at (SP)
+        // TODO: Memory write operation
+        // For now, just skip stack push (simplified)
+        
+        // Update PC
+        try self.func.emitLocalGet(Reg.PC);
+        try self.func.emitI32Const(2 + @as(i32, disp));
+        try self.func.emit(.i32_add);
+        try self.func.emitLocalSet(Reg.PC);
+        
+        // TODO: Actual subroutine call (needs proper stack handling)
     }
     
     /// Bcc → conditional branch
