@@ -221,9 +221,55 @@ pub const Decoder = struct {
     fn decodeGroup0(opcode: u16) Instruction {
         const bits_8_11 = (opcode >> 8) & 0xF;
         
-        if (bits_8_11 == 0) {
-            // Bit operations
-            return decodeBitOp(opcode);
+        // Immediate operations: 0x00xx - 0x0Cxx
+        if (bits_8_11 >= 0x0 and bits_8_11 <= 0xC) {
+            const bits_6_7 = (opcode >> 6) & 0x3;
+            
+            // Check if it's a bit operation (0x08xx with specific pattern)
+            if (bits_8_11 == 0x8) {
+                const bits_3_5 = (opcode >> 3) & 0x7;
+                if (bits_3_5 == 0) {
+                    return decodeBitOp(opcode);
+                }
+            }
+            
+            // Size encoding for immediate ops
+            const size: Size = switch (bits_6_7) {
+                0 => .Byte,
+                1 => .Word,
+                2 => .Long,
+                else => .Word,
+            };
+            
+            const op: Operation = switch (bits_8_11) {
+                0x0 => .ORI,
+                0x2 => .ANDI,
+                0x4 => .SUBI,
+                0x6 => .ADDI,
+                0xA => .EORI,
+                0xC => .CMPI,
+                else => return makeIllegal(opcode),
+            };
+            
+            const mode = @as(u3, @truncate((opcode >> 3) & 0x7));
+            const reg = @as(u3, @truncate(opcode & 0x7));
+            
+            return .{
+                .op = op,
+                .size = size,
+                .src_mode = .Immediate,
+                .src_reg = 0,
+                .src_imm = null,
+                .dst_mode = @enumFromInt(mode),
+                .dst_reg = reg,
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = if (size == .Long) @as(u8, 6) else 4,
+            };
         }
         
         if (opcode == 0x4E71) {
@@ -278,8 +324,11 @@ pub const Decoder = struct {
         const src_mode = @as(u3, @truncate((opcode >> 3) & 0x7));
         const src_reg = @as(u3, @truncate(opcode & 0x7));
         
+        // MOVEA: destination mode = 001 (address register direct)
+        const op: Operation = if (dst_mode == 1) .MOVEA else .MOVE;
+        
         return .{
-            .op = .MOVE,
+            .op = op,
             .size = size,
             .src_mode = @enumFromInt(src_mode),
             .src_reg = src_reg,
@@ -384,9 +433,31 @@ pub const Decoder = struct {
             };
         }
         
-        // EXT: 0100100xxx000xxx
+        // EXT/EXTB: 0100100xxx000xxx
         if ((opcode & 0xFEB8) == 0x4880) {
             const op_mode = (opcode >> 6) & 0x7;
+            
+            // EXTB.L: opmode = 111 (68020)
+            if (op_mode == 7) {
+                return .{
+                    .op = .EXTB,
+                    .size = .Long,
+                    .src_mode = .DataRegDirect,
+                    .src_reg = @as(u3, @truncate(opcode & 0x7)),
+                    .src_imm = null,
+                    .dst_mode = .DataRegDirect,
+                    .dst_reg = @as(u3, @truncate(opcode & 0x7)),
+                    .dst_imm = null,
+                    .disp = null,
+                    .condition = 0,
+                    .reg_mask = 0,
+                    .bf_offset = 0,
+                    .bf_width = 0,
+                    .length = 2,
+                };
+            }
+            
+            // EXT.W or EXT.L
             const size: Size = if (op_mode == 2) .Word else .Long;
             
             return .{
@@ -397,6 +468,149 @@ pub const Decoder = struct {
                 .src_imm = null,
                 .dst_mode = .DataRegDirect,
                 .dst_reg = @as(u3, @truncate(opcode & 0x7)),
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 2,
+            };
+        }
+        
+        // CLR: 01000010ssxxxxxx
+        if ((opcode & 0xFF00) == 0x4200) {
+            const size_bits = (opcode >> 6) & 0x3;
+            const mode = @as(u3, @truncate((opcode >> 3) & 0x7));
+            const reg = @as(u3, @truncate(opcode & 0x7));
+            
+            return .{
+                .op = .CLR,
+                .size = getSizeFromBits(size_bits),
+                .src_mode = @enumFromInt(mode),
+                .src_reg = reg,
+                .src_imm = null,
+                .dst_mode = @enumFromInt(mode),
+                .dst_reg = reg,
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 2,
+            };
+        }
+        
+        // NEG: 01000100ssxxxxxx
+        if ((opcode & 0xFF00) == 0x4400) {
+            const size_bits = (opcode >> 6) & 0x3;
+            const mode = @as(u3, @truncate((opcode >> 3) & 0x7));
+            const reg = @as(u3, @truncate(opcode & 0x7));
+            
+            return .{
+                .op = .NEG,
+                .size = getSizeFromBits(size_bits),
+                .src_mode = @enumFromInt(mode),
+                .src_reg = reg,
+                .src_imm = null,
+                .dst_mode = @enumFromInt(mode),
+                .dst_reg = reg,
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 2,
+            };
+        }
+        
+        // NEGX: 01000000ssxxxxxx
+        if ((opcode & 0xFF00) == 0x4000) {
+            const size_bits = (opcode >> 6) & 0x3;
+            const mode = @as(u3, @truncate((opcode >> 3) & 0x7));
+            const reg = @as(u3, @truncate(opcode & 0x7));
+            
+            return .{
+                .op = .NEGX,
+                .size = getSizeFromBits(size_bits),
+                .src_mode = @enumFromInt(mode),
+                .src_reg = reg,
+                .src_imm = null,
+                .dst_mode = @enumFromInt(mode),
+                .dst_reg = reg,
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 2,
+            };
+        }
+        
+        // NOT: 01000110ssxxxxxx
+        if ((opcode & 0xFF00) == 0x4600) {
+            const size_bits = (opcode >> 6) & 0x3;
+            const mode = @as(u3, @truncate((opcode >> 3) & 0x7));
+            const reg = @as(u3, @truncate(opcode & 0x7));
+            
+            return .{
+                .op = .NOT,
+                .size = getSizeFromBits(size_bits),
+                .src_mode = @enumFromInt(mode),
+                .src_reg = reg,
+                .src_imm = null,
+                .dst_mode = @enumFromInt(mode),
+                .dst_reg = reg,
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 2,
+            };
+        }
+        
+        // TAS: 0100101011xxxxxx (must check before TST!)
+        if ((opcode & 0xFFC0) == 0x4AC0) {
+            const mode = @as(u3, @truncate((opcode >> 3) & 0x7));
+            const reg = @as(u3, @truncate(opcode & 0x7));
+            
+            return .{
+                .op = .TAS,
+                .size = .Byte,
+                .src_mode = @enumFromInt(mode),
+                .src_reg = reg,
+                .src_imm = null,
+                .dst_mode = @enumFromInt(mode),
+                .dst_reg = reg,
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 2,
+            };
+        }
+        
+        // TST: 01001010ssxxxxxx
+        if ((opcode & 0xFF00) == 0x4A00) {
+            const size_bits = (opcode >> 6) & 0x3;
+            const mode = @as(u3, @truncate((opcode >> 3) & 0x7));
+            const reg = @as(u3, @truncate(opcode & 0x7));
+            
+            return .{
+                .op = .TST,
+                .size = getSizeFromBits(size_bits),
+                .src_mode = @enumFromInt(mode),
+                .src_reg = reg,
+                .src_imm = null,
+                .dst_mode = @enumFromInt(mode),
+                .dst_reg = reg,
                 .dst_imm = null,
                 .disp = null,
                 .condition = 0,
@@ -516,22 +730,108 @@ pub const Decoder = struct {
     }
     
     fn decodeOR(opcode: u16) Instruction {
+        // DIVU: 1000xxx011xxxxxx (opmode = 011)
+        // DIVS: 1000xxx111xxxxxx (opmode = 111)
+        const op_mode = (opcode >> 6) & 0x7;
+        
+        if (op_mode == 3) {
+            return .{
+                .op = .DIVU,
+                .size = .Word,
+                .src_mode = @enumFromInt(@as(u3, @truncate((opcode >> 3) & 0x7))),
+                .src_reg = @as(u3, @truncate(opcode & 0x7)),
+                .src_imm = null,
+                .dst_mode = .DataRegDirect,
+                .dst_reg = @as(u3, @truncate((opcode >> 9) & 0x7)),
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 2,
+            };
+        }
+        
+        if (op_mode == 7) {
+            return .{
+                .op = .DIVS,
+                .size = .Word,
+                .src_mode = @enumFromInt(@as(u3, @truncate((opcode >> 3) & 0x7))),
+                .src_reg = @as(u3, @truncate(opcode & 0x7)),
+                .src_imm = null,
+                .dst_mode = .DataRegDirect,
+                .dst_reg = @as(u3, @truncate((opcode >> 9) & 0x7)),
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 2,
+            };
+        }
+        
         return decodeLogic(opcode, .OR);
     }
     
     fn decodeSUBADD(opcode: u16) Instruction {
         const primary = (opcode >> 12) & 0xF;
-        const op: Operation = if (primary == 0x9) .SUB else .ADD;
+        const base_op: Operation = if (primary == 0x9) .SUB else .ADD;
         const op_mode = (opcode >> 6) & 0x7;
+        const dst_reg = @as(u3, @truncate((opcode >> 9) & 0x7));
+        const src_mode = @as(u3, @truncate((opcode >> 3) & 0x7));
+        const src_reg = @as(u3, @truncate(opcode & 0x7));
         
+        // ADDA/SUBA: opmode = 011 (word) or 111 (long)
+        if (op_mode == 3 or op_mode == 7) {
+            return .{
+                .op = if (base_op == .ADD) .ADDA else .SUBA,
+                .size = if (op_mode == 3) .Word else .Long,
+                .src_mode = @enumFromInt(src_mode),
+                .src_reg = src_reg,
+                .src_imm = null,
+                .dst_mode = .AddrRegDirect,
+                .dst_reg = dst_reg,
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 2,
+            };
+        }
+        
+        // ADDX/SUBX: opmode = 100/101/110 (size) with register-to-register
+        if ((op_mode & 0x4) != 0 and src_mode == 0) {
+            return .{
+                .op = if (base_op == .ADD) .ADDX else .SUBX,
+                .size = getSizeFromBits(op_mode & 0x3),
+                .src_mode = .DataRegDirect,
+                .src_reg = src_reg,
+                .src_imm = null,
+                .dst_mode = .DataRegDirect,
+                .dst_reg = dst_reg,
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 2,
+            };
+        }
+        
+        // Regular ADD/SUB
         return .{
-            .op = op,
+            .op = base_op,
             .size = getSizeFromBits(op_mode & 0x3),
-            .src_mode = @enumFromInt(@as(u3, @truncate((opcode >> 3) & 0x7))),
-            .src_reg = @as(u3, @truncate(opcode & 0x7)),
+            .src_mode = @enumFromInt(src_mode),
+            .src_reg = src_reg,
             .src_imm = null,
             .dst_mode = .DataRegDirect,
-            .dst_reg = @as(u3, @truncate((opcode >> 9) & 0x7)),
+            .dst_reg = dst_reg,
             .dst_imm = null,
             .disp = null,
             .condition = 0,
@@ -544,27 +844,113 @@ pub const Decoder = struct {
     
     fn decodeCMPEOR(opcode: u16) Instruction {
         const bit_8 = (opcode >> 8) & 1;
-        const op: Operation = if (bit_8 == 0) .CMP else .EOR;
+        const op_mode = (opcode >> 6) & 0x7;
+        const dst_reg = @as(u3, @truncate((opcode >> 9) & 0x7));
+        const src_mode = @as(u3, @truncate((opcode >> 3) & 0x7));
+        const src_reg = @as(u3, @truncate(opcode & 0x7));
         
-        return .{
-            .op = op,
-            .size = getSizeFromBits((opcode >> 6) & 0x3),
-            .src_mode = @enumFromInt(@as(u3, @truncate((opcode >> 3) & 0x7))),
-            .src_reg = @as(u3, @truncate(opcode & 0x7)),
-            .src_imm = null,
-            .dst_mode = .DataRegDirect,
-            .dst_reg = @as(u3, @truncate((opcode >> 9) & 0x7)),
-            .dst_imm = null,
-            .disp = null,
-            .condition = 0,
-            .reg_mask = 0,
-            .bf_offset = 0,
-            .bf_width = 0,
-            .length = 2,
-        };
+        // CMPA: opmode = 011 (word) or 111 (long), regardless of bit_8
+        if (op_mode == 3 or op_mode == 7) {
+            return .{
+                .op = .CMPA,
+                .size = if (op_mode == 3) .Word else .Long,
+                .src_mode = @enumFromInt(src_mode),
+                .src_reg = src_reg,
+                .src_imm = null,
+                .dst_mode = .AddrRegDirect,
+                .dst_reg = dst_reg,
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 2,
+            };
+        }
+        
+        if (bit_8 == 0) {
+            // Regular CMP
+            return .{
+                .op = .CMP,
+                .size = getSizeFromBits(op_mode & 0x3),
+                .src_mode = @enumFromInt(src_mode),
+                .src_reg = src_reg,
+                .src_imm = null,
+                .dst_mode = .DataRegDirect,
+                .dst_reg = dst_reg,
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 2,
+            };
+        } else {
+            // EOR
+            return .{
+                .op = .EOR,
+                .size = getSizeFromBits(op_mode & 0x3),
+                .src_mode = @enumFromInt(src_mode),
+                .src_reg = src_reg,
+                .src_imm = null,
+                .dst_mode = .DataRegDirect,
+                .dst_reg = dst_reg,
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 2,
+            };
+        }
     }
     
     fn decodeAND(opcode: u16) Instruction {
+        // MULU: 1100xxx011xxxxxx (opmode = 011)
+        // MULS: 1100xxx111xxxxxx (opmode = 111)
+        const op_mode = (opcode >> 6) & 0x7;
+        
+        if (op_mode == 3) {
+            return .{
+                .op = .MULU,
+                .size = .Word,
+                .src_mode = @enumFromInt(@as(u3, @truncate((opcode >> 3) & 0x7))),
+                .src_reg = @as(u3, @truncate(opcode & 0x7)),
+                .src_imm = null,
+                .dst_mode = .DataRegDirect,
+                .dst_reg = @as(u3, @truncate((opcode >> 9) & 0x7)),
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 2,
+            };
+        }
+        
+        if (op_mode == 7) {
+            return .{
+                .op = .MULS,
+                .size = .Word,
+                .src_mode = @enumFromInt(@as(u3, @truncate((opcode >> 3) & 0x7))),
+                .src_reg = @as(u3, @truncate(opcode & 0x7)),
+                .src_imm = null,
+                .dst_mode = .DataRegDirect,
+                .dst_reg = @as(u3, @truncate((opcode >> 9) & 0x7)),
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 2,
+            };
+        }
+        
         return decodeLogic(opcode, .AND);
     }
     
@@ -576,6 +962,7 @@ pub const Decoder = struct {
             0 => if (direction == 0) .ASR else .ASL,
             1 => if (direction == 0) .LSR else .LSL,
             2 => if (direction == 0) .ROR else .ROL,
+            3 => if (direction == 0) .ROXR else .ROXL,
             else => .ILLEGAL,
         };
         
