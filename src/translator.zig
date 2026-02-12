@@ -159,6 +159,7 @@ pub const Translator = struct {
             .BRA => try self.translateBRA(instr),
             .BSR => try self.translateBSR(instr),
             .Bcc => try self.translateBcc(instr),
+            .JMP => try self.translateJMP(instr),
             .JSR => try self.translateJSR(instr),
             .RTS => try self.translateRTS(instr),
             else => {
@@ -1861,6 +1862,17 @@ pub const Translator = struct {
     }
     
     /// JSR - Jump to subroutine
+    /// JMP → Jump (unconditional)
+    fn translateJMP(self: *Translator, instr: Instruction) !void {
+        // JMP (EA)
+        // Load target address from EA and set PC
+        
+        // Load target address
+        try self.loadEA(instr.src_mode, instr.src_reg, .Long);
+        try self.func.emitLocalSet(Reg.PC);
+    }
+    
+    /// JSR → Jump to subroutine
     fn translateJSR(self: *Translator, instr: Instruction) !void {
         // JSR (An)
         // 1. Push return address to stack

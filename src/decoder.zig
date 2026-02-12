@@ -373,6 +373,52 @@ pub const Decoder = struct {
             };
         }
         
+        // JMP: 0100111011xxxxxx
+        if ((opcode & 0xFFC0) == 0x4EC0) {
+            const mode = @as(u3, @truncate((opcode >> 3) & 0x7));
+            const reg = @as(u3, @truncate(opcode & 0x7));
+            
+            return .{
+                .op = .JMP,
+                .size = .Word,
+                .src_mode = @enumFromInt(mode),
+                .src_reg = reg,
+                .src_imm = null,
+                .dst_mode = .DataRegDirect,
+                .dst_reg = 0,
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 2,
+            };
+        }
+        
+        // JSR: 0100111010xxxxxx
+        if ((opcode & 0xFFC0) == 0x4E80) {
+            const mode = @as(u3, @truncate((opcode >> 3) & 0x7));
+            const reg = @as(u3, @truncate(opcode & 0x7));
+            
+            return .{
+                .op = .JSR,
+                .size = .Word,
+                .src_mode = @enumFromInt(mode),
+                .src_reg = reg,
+                .src_imm = null,
+                .dst_mode = .DataRegDirect,
+                .dst_reg = 0,
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 2,
+            };
+        }
+        
         // SWAP: 0100100001000xxx
         if ((opcode & 0xFFF8) == 0x4840) {
             return .{

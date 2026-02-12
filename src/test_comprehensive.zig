@@ -82,11 +82,11 @@ pub fn main() !void {
         .{ .name = "BCHG #2,D0", .opcode = 0x0840, .expected_op = .BCHG, .should_compile = true },
         .{ .name = "TAS D0", .opcode = 0x4AC0, .expected_op = .TAS, .should_compile = true },
         
-        // Program Control (19) - Branch instructions
+        // Program Control (22) - Branch and Jump
         .{ .name = "NOP", .opcode = 0x4E71, .expected_op = .NOP, .should_compile = true },
         .{ .name = "BRA +10", .opcode = 0x600A, .expected_op = .BRA, .should_compile = true },
         .{ .name = "BSR +20", .opcode = 0x6114, .expected_op = .BSR, .should_compile = true },
-        // Bcc - All 16 conditional branches (only testing decode, not execution)
+        // Bcc - All 14 conditional branches
         .{ .name = "BHI +8", .opcode = 0x6208, .expected_op = .Bcc, .should_compile = true },
         .{ .name = "BLS +8", .opcode = 0x6308, .expected_op = .Bcc, .should_compile = true },
         .{ .name = "BCC +8", .opcode = 0x6408, .expected_op = .Bcc, .should_compile = true },
@@ -101,6 +101,10 @@ pub fn main() !void {
         .{ .name = "BLT +8", .opcode = 0x6D08, .expected_op = .Bcc, .should_compile = true },
         .{ .name = "BGT +8", .opcode = 0x6E08, .expected_op = .Bcc, .should_compile = true },
         .{ .name = "BLE +8", .opcode = 0x6F08, .expected_op = .Bcc, .should_compile = true },
+        // Jump and Subroutine
+        .{ .name = "JMP (A0)", .opcode = 0x4ED0, .expected_op = .JMP, .should_compile = true },
+        .{ .name = "JSR (A0)", .opcode = 0x4E90, .expected_op = .JSR, .should_compile = true },
+        .{ .name = "RTS", .opcode = 0x4E75, .expected_op = .RTS, .should_compile = true },
     };
     
     var passed: u32 = 0;
