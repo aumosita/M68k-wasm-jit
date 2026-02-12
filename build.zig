@@ -44,6 +44,21 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run JIT test");
     run_step.dependOn(&run_cmd.step);
 
+    // Comprehensive test executable
+    const comprehensive_test = b.addExecutable(.{
+        .name = "test-comprehensive",
+        .root_source_file = b.path("src/test_comprehensive.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    b.installArtifact(comprehensive_test);
+
+    const run_comprehensive = b.addRunArtifact(comprehensive_test);
+    run_comprehensive.step.dependOn(b.getInstallStep());
+    
+    const comprehensive_step = b.step("test-comprehensive", "Run comprehensive instruction tests");
+    comprehensive_step.dependOn(&run_comprehensive.step);
+
     // Unit tests
     const lib_tests = b.addTest(.{
         .root_source_file = b.path("src/root.zig"),
