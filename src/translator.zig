@@ -102,16 +102,46 @@ pub const Translator = struct {
         switch (instr.op) {
             .MOVEQ => try self.translateMOVEQ(instr),
             .MOVE => try self.translateMOVE(instr),
+            .MOVEA => try self.translateMOVEA(instr),
             .LEA => try self.translateLEA(instr),
             .PEA => try self.translatePEA(instr),
+            .LINK => try self.translateLINK(instr),
+            .UNLK => try self.translateUNLK(instr),
             .EXG => try self.translateEXG(instr),
             .SWAP => try self.translateSWAP(instr),
             .EXT => try self.translateEXT(instr),
+            .EXTB => try self.translateEXTB(instr),
             .ADD => try self.translateADD(instr),
+            .ADDI => try self.translateADDI(instr),
+            .ADDQ => try self.translateADDQ(instr),
             .SUB => try self.translateSUB(instr),
+            .SUBI => try self.translateSUBI(instr),
+            .SUBQ => try self.translateSUBQ(instr),
+            .CLR => try self.translateCLR(instr),
+            .NEG => try self.translateNEG(instr),
+            .TST => try self.translateTST(instr),
+            .CMP => try self.translateCMP(instr),
+            .CMPI => try self.translateCMPI(instr),
             .AND => try self.translateAND(instr),
+            .ANDI => try self.translateANDI(instr),
             .OR => try self.translateOR(instr),
+            .ORI => try self.translateORI(instr),
             .EOR => try self.translateEOR(instr),
+            .EORI => try self.translateEORI(instr),
+            .NOT => try self.translateNOT(instr),
+            .ASL => try self.translateASL(instr),
+            .ASR => try self.translateASR(instr),
+            .LSL => try self.translateLSL(instr),
+            .LSR => try self.translateLSR(instr),
+            .ROL => try self.translateROL(instr),
+            .ROR => try self.translateROR(instr),
+            .ROXL => try self.translateROXL(instr),
+            .ROXR => try self.translateROXR(instr),
+            .BTST => try self.translateBTST(instr),
+            .BSET => try self.translateBSET(instr),
+            .BCLR => try self.translateBCLR(instr),
+            .BCHG => try self.translateBCHG(instr),
+            .TAS => try self.translateTAS(instr),
             .NOP => try self.translateNOP(instr),
             .BRA => try self.translateBRA(instr),
             .Bcc => try self.translateBcc(instr),
@@ -189,6 +219,34 @@ pub const Translator = struct {
         if (instr.dst_mode == .DataRegDirect) {
             try self.updateFlagsNZ(dst);
         }
+    }
+    
+    /// MOVEA - Move to Address register (no flags updated)
+    fn translateMOVEA(self: *Translator, instr: Instruction) !void {
+        // MOVEA <ea>, An
+        // Similar to MOVE but:
+        // 1. Destination is always An
+        // 2. Does NOT update flags
+        // 3. Always sign-extends to 32-bit if source is .Word
+        
+        const dst = Reg.addrReg(instr.dst_reg);
+        
+        // Load source value
+        try self.loadEA(instr.src_mode, instr.src_reg, instr.size);
+        
+        // Sign-extend if Word size
+        if (instr.size == .Word) {
+            // Sign extend 16-bit to 32-bit
+            try self.func.emitI32Const(16);
+            try self.func.emit(.i32_shl);
+            try self.func.emitI32Const(16);
+            try self.func.emit(.i32_shr_s);
+        }
+        
+        // Store to address register
+        try self.func.emitLocalSet(dst);
+        
+        // No flag updates for MOVEA
     }
     
     /// Load effective address value onto stack
@@ -344,6 +402,56 @@ pub const Translator = struct {
         // TODO: C, V flags
     }
     
+    /// ADDI - Add immediate
+    fn translateADDI(self: *Translator, instr: Instruction) !void {
+        // ADDI #imm, <ea>
+        const imm = instr.src_imm orelse return error.InvalidInstruction;
+        
+        if (instr.dst_mode == .DataRegDirect) {
+            const dst = Reg.dataReg(instr.dst_reg);
+            
+            // dst = dst + imm
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(imm);
+            try self.func.emit(.i32_add);
+            try self.func.emitLocalSet(dst);
+            
+            try self.updateFlagsNZ(dst);
+        } else {
+            // Memory destination
+            return error.UnsupportedEAMode;
+        }
+    }
+    
+    /// ADDQ - Add quick (1-8 immediate)
+    fn translateADDQ(self: *Translator, instr: Instruction) !void {
+        // ADDQ #imm, <ea>
+        // imm is 1-8 (stored as 0-7, 0 means 8)
+        const imm = instr.src_imm orelse return error.InvalidInstruction;
+        const actual_imm = if (imm == 0) @as(i32, 8) else @as(i32, @intCast(imm));
+        
+        if (instr.dst_mode == .DataRegDirect) {
+            const dst = Reg.dataReg(instr.dst_reg);
+            
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(actual_imm);
+            try self.func.emit(.i32_add);
+            try self.func.emitLocalSet(dst);
+            
+            try self.updateFlagsNZ(dst);
+        } else if (instr.dst_mode == .AddrRegDirect) {
+            // Address register - no flag update
+            const dst = Reg.addrReg(instr.dst_reg);
+            
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(actual_imm);
+            try self.func.emit(.i32_add);
+            try self.func.emitLocalSet(dst);
+        } else {
+            return error.UnsupportedEAMode;
+        }
+    }
+    
     /// SUB Dn, Dm
     fn translateSUB(self: *Translator, instr: Instruction) !void {
         const src = Reg.dataReg(instr.src_reg);
@@ -355,6 +463,162 @@ pub const Translator = struct {
         try self.func.emitLocalSet(dst);
         
         try self.updateFlagsNZ(dst);
+    }
+    
+    /// SUBI - Subtract immediate
+    fn translateSUBI(self: *Translator, instr: Instruction) !void {
+        // SUBI #imm, <ea>
+        const imm = instr.src_imm orelse return error.InvalidInstruction;
+        
+        if (instr.dst_mode == .DataRegDirect) {
+            const dst = Reg.dataReg(instr.dst_reg);
+            
+            // dst = dst - imm
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(imm);
+            try self.func.emit(.i32_sub);
+            try self.func.emitLocalSet(dst);
+            
+            try self.updateFlagsNZ(dst);
+        } else {
+            return error.UnsupportedEAMode;
+        }
+    }
+    
+    /// SUBQ - Subtract quick (1-8 immediate)
+    fn translateSUBQ(self: *Translator, instr: Instruction) !void {
+        // SUBQ #imm, <ea>
+        const imm = instr.src_imm orelse return error.InvalidInstruction;
+        const actual_imm = if (imm == 0) @as(i32, 8) else @as(i32, @intCast(imm));
+        
+        if (instr.dst_mode == .DataRegDirect) {
+            const dst = Reg.dataReg(instr.dst_reg);
+            
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(actual_imm);
+            try self.func.emit(.i32_sub);
+            try self.func.emitLocalSet(dst);
+            
+            try self.updateFlagsNZ(dst);
+        } else if (instr.dst_mode == .AddrRegDirect) {
+            // Address register - no flag update
+            const dst = Reg.addrReg(instr.dst_reg);
+            
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(actual_imm);
+            try self.func.emit(.i32_sub);
+            try self.func.emitLocalSet(dst);
+        } else {
+            return error.UnsupportedEAMode;
+        }
+    }
+    
+    /// CLR - Clear operand (set to zero)
+    fn translateCLR(self: *Translator, instr: Instruction) !void {
+        // CLR <ea>
+        if (instr.dst_mode == .DataRegDirect) {
+            const dst = Reg.dataReg(instr.dst_reg);
+            
+            // dst = 0
+            try self.func.emitI32Const(0);
+            try self.func.emitLocalSet(dst);
+            
+            // Flags: N=0, Z=1, V=0, C=0
+            try self.func.emitI32Const(0);
+            try self.func.emitLocalSet(Reg.FLAG_N);
+            try self.func.emitI32Const(1);
+            try self.func.emitLocalSet(Reg.FLAG_Z);
+            try self.func.emitI32Const(0);
+            try self.func.emitLocalSet(Reg.FLAG_V);
+            try self.func.emitI32Const(0);
+            try self.func.emitLocalSet(Reg.FLAG_C);
+        } else {
+            return error.UnsupportedEAMode;
+        }
+    }
+    
+    /// NEG - Negate (0 - operand)
+    fn translateNEG(self: *Translator, instr: Instruction) !void {
+        // NEG <ea>
+        if (instr.dst_mode == .DataRegDirect) {
+            const dst = Reg.dataReg(instr.dst_reg);
+            
+            // dst = 0 - dst
+            try self.func.emitI32Const(0);
+            try self.func.emitLocalGet(dst);
+            try self.func.emit(.i32_sub);
+            try self.func.emitLocalSet(dst);
+            
+            try self.updateFlagsNZ(dst);
+            // TODO: C, V, X flags
+        } else {
+            return error.UnsupportedEAMode;
+        }
+    }
+    
+    /// TST - Test operand (compare with 0)
+    fn translateTST(self: *Translator, instr: Instruction) !void {
+        // TST <ea>
+        // Updates flags but doesn't modify operand
+        if (instr.dst_mode == .DataRegDirect) {
+            const dst = Reg.dataReg(instr.dst_reg);
+            
+            // Just update flags based on current value
+            try self.updateFlagsNZ(dst);
+            
+            // V=0, C=0
+            try self.func.emitI32Const(0);
+            try self.func.emitLocalSet(Reg.FLAG_V);
+            try self.func.emitI32Const(0);
+            try self.func.emitLocalSet(Reg.FLAG_C);
+        } else {
+            return error.UnsupportedEAMode;
+        }
+    }
+    
+    /// CMP - Compare (src - dst, update flags only)
+    fn translateCMP(self: *Translator, instr: Instruction) !void {
+        // CMP <ea>, Dn
+        // Compute dst - src, update flags, don't store result
+        const dst = Reg.dataReg(instr.dst_reg);
+        
+        // Load source
+        try self.loadEA(instr.src_mode, instr.src_reg, instr.size);
+        
+        // Compute dst - src
+        try self.func.emitLocalGet(dst);
+        try self.func.emit(.i32_sub);
+        
+        // Store in temp for flag calculation
+        const temp = try self.func.addLocal(.i32);
+        try self.func.emitLocalSet(temp);
+        
+        // Update flags based on temp
+        try self.updateFlagsNZ(temp);
+        // TODO: C, V flags
+    }
+    
+    /// CMPI - Compare immediate
+    fn translateCMPI(self: *Translator, instr: Instruction) !void {
+        // CMPI #imm, <ea>
+        const imm = instr.src_imm orelse return error.InvalidInstruction;
+        
+        if (instr.dst_mode == .DataRegDirect) {
+            const dst = Reg.dataReg(instr.dst_reg);
+            
+            // Compute dst - imm
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(imm);
+            try self.func.emit(.i32_sub);
+            
+            // Store in temp
+            const temp = try self.func.addLocal(.i32);
+            try self.func.emitLocalSet(temp);
+            
+            try self.updateFlagsNZ(temp);
+        } else {
+            return error.UnsupportedEAMode;
+        }
     }
     
     /// AND Dn, Dm
@@ -376,6 +640,30 @@ pub const Translator = struct {
         try self.func.emitLocalSet(Reg.FLAG_C);
     }
     
+    /// ANDI - AND immediate
+    fn translateANDI(self: *Translator, instr: Instruction) !void {
+        // ANDI #imm, <ea>
+        const imm = instr.src_imm orelse return error.InvalidInstruction;
+        
+        if (instr.dst_mode == .DataRegDirect) {
+            const dst = Reg.dataReg(instr.dst_reg);
+            
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(imm);
+            try self.func.emit(.i32_and);
+            try self.func.emitLocalSet(dst);
+            
+            try self.updateFlagsNZ(dst);
+            
+            try self.func.emitI32Const(0);
+            try self.func.emitLocalSet(Reg.FLAG_V);
+            try self.func.emitI32Const(0);
+            try self.func.emitLocalSet(Reg.FLAG_C);
+        } else {
+            return error.UnsupportedEAMode;
+        }
+    }
+    
     /// OR Dn, Dm
     fn translateOR(self: *Translator, instr: Instruction) !void {
         const src = Reg.dataReg(instr.src_reg);
@@ -394,6 +682,30 @@ pub const Translator = struct {
         try self.func.emitLocalSet(Reg.FLAG_C);
     }
     
+    /// ORI - OR immediate
+    fn translateORI(self: *Translator, instr: Instruction) !void {
+        // ORI #imm, <ea>
+        const imm = instr.src_imm orelse return error.InvalidInstruction;
+        
+        if (instr.dst_mode == .DataRegDirect) {
+            const dst = Reg.dataReg(instr.dst_reg);
+            
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(imm);
+            try self.func.emit(.i32_or);
+            try self.func.emitLocalSet(dst);
+            
+            try self.updateFlagsNZ(dst);
+            
+            try self.func.emitI32Const(0);
+            try self.func.emitLocalSet(Reg.FLAG_V);
+            try self.func.emitI32Const(0);
+            try self.func.emitLocalSet(Reg.FLAG_C);
+        } else {
+            return error.UnsupportedEAMode;
+        }
+    }
+    
     /// EOR Dn, Dm
     fn translateEOR(self: *Translator, instr: Instruction) !void {
         const src = Reg.dataReg(instr.src_reg);
@@ -410,6 +722,551 @@ pub const Translator = struct {
         try self.func.emitLocalSet(Reg.FLAG_V);
         try self.func.emitI32Const(0);
         try self.func.emitLocalSet(Reg.FLAG_C);
+    }
+    
+    /// EORI - EOR immediate
+    fn translateEORI(self: *Translator, instr: Instruction) !void {
+        // EORI #imm, <ea>
+        const imm = instr.src_imm orelse return error.InvalidInstruction;
+        
+        if (instr.dst_mode == .DataRegDirect) {
+            const dst = Reg.dataReg(instr.dst_reg);
+            
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(imm);
+            try self.func.emit(.i32_xor);
+            try self.func.emitLocalSet(dst);
+            
+            try self.updateFlagsNZ(dst);
+            
+            try self.func.emitI32Const(0);
+            try self.func.emitLocalSet(Reg.FLAG_V);
+            try self.func.emitI32Const(0);
+            try self.func.emitLocalSet(Reg.FLAG_C);
+        } else {
+            return error.UnsupportedEAMode;
+        }
+    }
+    
+    /// NOT - Logical complement
+    fn translateNOT(self: *Translator, instr: Instruction) !void {
+        // NOT <ea>
+        if (instr.dst_mode == .DataRegDirect) {
+            const dst = Reg.dataReg(instr.dst_reg);
+            
+            // dst = ~dst (bitwise NOT)
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(-1);
+            try self.func.emit(.i32_xor);
+            try self.func.emitLocalSet(dst);
+            
+            try self.updateFlagsNZ(dst);
+            
+            try self.func.emitI32Const(0);
+            try self.func.emitLocalSet(Reg.FLAG_V);
+            try self.func.emitI32Const(0);
+            try self.func.emitLocalSet(Reg.FLAG_C);
+        } else {
+            return error.UnsupportedEAMode;
+        }
+    }
+    
+    /// ASL - Arithmetic shift left
+    fn translateASL(self: *Translator, instr: Instruction) !void {
+        // ASL Dx, Dy  or  ASL #imm, Dy
+        const dst = Reg.dataReg(instr.dst_reg);
+        
+        if (instr.src_mode == .DataRegDirect) {
+            // Shift count in register
+            const src = Reg.dataReg(instr.src_reg);
+            
+            // dst = dst << (src & 63)
+            try self.func.emitLocalGet(dst);
+            try self.func.emitLocalGet(src);
+            try self.func.emitI32Const(63);
+            try self.func.emit(.i32_and);
+            try self.func.emit(.i32_shl);
+            try self.func.emitLocalSet(dst);
+        } else {
+            // Immediate shift count (1-8)
+            const count = instr.src_imm orelse return error.InvalidInstruction;
+            const actual_count = if (count == 0) @as(i32, 8) else @as(i32, @intCast(count));
+            
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(actual_count);
+            try self.func.emit(.i32_shl);
+            try self.func.emitLocalSet(dst);
+        }
+        
+        try self.updateFlagsNZ(dst);
+        // TODO: C, V, X flags
+    }
+    
+    /// ASR - Arithmetic shift right
+    fn translateASR(self: *Translator, instr: Instruction) !void {
+        // ASR Dx, Dy  or  ASR #imm, Dy
+        const dst = Reg.dataReg(instr.dst_reg);
+        
+        if (instr.src_mode == .DataRegDirect) {
+            const src = Reg.dataReg(instr.src_reg);
+            
+            // dst = dst >> (src & 63) (arithmetic)
+            try self.func.emitLocalGet(dst);
+            try self.func.emitLocalGet(src);
+            try self.func.emitI32Const(63);
+            try self.func.emit(.i32_and);
+            try self.func.emit(.i32_shr_s); // Arithmetic shift (sign-extend)
+            try self.func.emitLocalSet(dst);
+        } else {
+            const count = instr.src_imm orelse return error.InvalidInstruction;
+            const actual_count = if (count == 0) @as(i32, 8) else @as(i32, @intCast(count));
+            
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(actual_count);
+            try self.func.emit(.i32_shr_s);
+            try self.func.emitLocalSet(dst);
+        }
+        
+        try self.updateFlagsNZ(dst);
+    }
+    
+    /// LSL - Logical shift left
+    fn translateLSL(self: *Translator, instr: Instruction) !void {
+        // LSL Dx, Dy  or  LSL #imm, Dy
+        const dst = Reg.dataReg(instr.dst_reg);
+        
+        if (instr.src_mode == .DataRegDirect) {
+            const src = Reg.dataReg(instr.src_reg);
+            
+            try self.func.emitLocalGet(dst);
+            try self.func.emitLocalGet(src);
+            try self.func.emitI32Const(63);
+            try self.func.emit(.i32_and);
+            try self.func.emit(.i32_shl);
+            try self.func.emitLocalSet(dst);
+        } else {
+            const count = instr.src_imm orelse return error.InvalidInstruction;
+            const actual_count = if (count == 0) @as(i32, 8) else @as(i32, @intCast(count));
+            
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(actual_count);
+            try self.func.emit(.i32_shl);
+            try self.func.emitLocalSet(dst);
+        }
+        
+        try self.updateFlagsNZ(dst);
+        // TODO: C, X flags
+    }
+    
+    /// LSR - Logical shift right
+    fn translateLSR(self: *Translator, instr: Instruction) !void {
+        // LSR Dx, Dy  or  LSR #imm, Dy
+        const dst = Reg.dataReg(instr.dst_reg);
+        
+        if (instr.src_mode == .DataRegDirect) {
+            const src = Reg.dataReg(instr.src_reg);
+            
+            // dst = dst >> (src & 63) (logical)
+            try self.func.emitLocalGet(dst);
+            try self.func.emitLocalGet(src);
+            try self.func.emitI32Const(63);
+            try self.func.emit(.i32_and);
+            try self.func.emit(.i32_shr_u); // Logical shift (zero-extend)
+            try self.func.emitLocalSet(dst);
+        } else {
+            const count = instr.src_imm orelse return error.InvalidInstruction;
+            const actual_count = if (count == 0) @as(i32, 8) else @as(i32, @intCast(count));
+            
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(actual_count);
+            try self.func.emit(.i32_shr_u);
+            try self.func.emitLocalSet(dst);
+        }
+        
+        try self.updateFlagsNZ(dst);
+    }
+    
+    /// ROL - Rotate left
+    fn translateROL(self: *Translator, instr: Instruction) !void {
+        // ROL Dx, Dy  or  ROL #imm, Dy
+        const dst = Reg.dataReg(instr.dst_reg);
+        
+        if (instr.src_mode == .DataRegDirect) {
+            const src = Reg.dataReg(instr.src_reg);
+            
+            // dst = rotl(dst, src & 63)
+            try self.func.emitLocalGet(dst);
+            try self.func.emitLocalGet(src);
+            try self.func.emitI32Const(63);
+            try self.func.emit(.i32_and);
+            try self.func.emit(.i32_rotl);
+            try self.func.emitLocalSet(dst);
+        } else {
+            const count = instr.src_imm orelse return error.InvalidInstruction;
+            const actual_count = if (count == 0) @as(i32, 8) else @as(i32, @intCast(count));
+            
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(actual_count);
+            try self.func.emit(.i32_rotl);
+            try self.func.emitLocalSet(dst);
+        }
+        
+        try self.updateFlagsNZ(dst);
+        // TODO: C flag (last bit rotated)
+    }
+    
+    /// ROR - Rotate right
+    fn translateROR(self: *Translator, instr: Instruction) !void {
+        // ROR Dx, Dy  or  ROR #imm, Dy
+        const dst = Reg.dataReg(instr.dst_reg);
+        
+        if (instr.src_mode == .DataRegDirect) {
+            const src = Reg.dataReg(instr.src_reg);
+            
+            // dst = rotr(dst, src & 63)
+            try self.func.emitLocalGet(dst);
+            try self.func.emitLocalGet(src);
+            try self.func.emitI32Const(63);
+            try self.func.emit(.i32_and);
+            try self.func.emit(.i32_rotr);
+            try self.func.emitLocalSet(dst);
+        } else {
+            const count = instr.src_imm orelse return error.InvalidInstruction;
+            const actual_count = if (count == 0) @as(i32, 8) else @as(i32, @intCast(count));
+            
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(actual_count);
+            try self.func.emit(.i32_rotr);
+            try self.func.emitLocalSet(dst);
+        }
+        
+        try self.updateFlagsNZ(dst);
+    }
+    
+    /// ROXL - Rotate left with extend
+    fn translateROXL(self: *Translator, instr: Instruction) !void {
+        // ROXL Dx, Dy  or  ROXL #imm, Dy
+        // Rotate through X flag (9-bit rotate for byte/word, 33-bit for long)
+        const dst = Reg.dataReg(instr.dst_reg);
+        
+        // Simplified: treat as regular rotate for now
+        // TODO: Implement proper 9/17/33-bit rotate with X flag
+        
+        if (instr.src_mode == .DataRegDirect) {
+            const src = Reg.dataReg(instr.src_reg);
+            
+            try self.func.emitLocalGet(dst);
+            try self.func.emitLocalGet(src);
+            try self.func.emitI32Const(63);
+            try self.func.emit(.i32_and);
+            try self.func.emit(.i32_rotl);
+            try self.func.emitLocalSet(dst);
+        } else {
+            const count = instr.src_imm orelse return error.InvalidInstruction;
+            const actual_count = if (count == 0) @as(i32, 8) else @as(i32, @intCast(count));
+            
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(actual_count);
+            try self.func.emit(.i32_rotl);
+            try self.func.emitLocalSet(dst);
+        }
+        
+        try self.updateFlagsNZ(dst);
+        // TODO: X flag handling
+    }
+    
+    /// ROXR - Rotate right with extend
+    fn translateROXR(self: *Translator, instr: Instruction) !void {
+        // ROXR Dx, Dy  or  ROXR #imm, Dy
+        const dst = Reg.dataReg(instr.dst_reg);
+        
+        // Simplified: treat as regular rotate for now
+        // TODO: Implement proper 9/17/33-bit rotate with X flag
+        
+        if (instr.src_mode == .DataRegDirect) {
+            const src = Reg.dataReg(instr.src_reg);
+            
+            try self.func.emitLocalGet(dst);
+            try self.func.emitLocalGet(src);
+            try self.func.emitI32Const(63);
+            try self.func.emit(.i32_and);
+            try self.func.emit(.i32_rotr);
+            try self.func.emitLocalSet(dst);
+        } else {
+            const count = instr.src_imm orelse return error.InvalidInstruction;
+            const actual_count = if (count == 0) @as(i32, 8) else @as(i32, @intCast(count));
+            
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(actual_count);
+            try self.func.emit(.i32_rotr);
+            try self.func.emitLocalSet(dst);
+        }
+        
+        try self.updateFlagsNZ(dst);
+    }
+    
+    /// BTST - Test bit
+    fn translateBTST(self: *Translator, instr: Instruction) !void {
+        // BTST Dn, <ea>  or  BTST #imm, <ea>
+        // Test bit, set Z flag (Z = !bit)
+        
+        if (instr.dst_mode == .DataRegDirect) {
+            const dst = Reg.dataReg(instr.dst_reg);
+            
+            if (instr.src_mode == .DataRegDirect) {
+                // Bit number in register
+                const src = Reg.dataReg(instr.src_reg);
+                
+                // bit_num = src & 31 (for long)
+                // bit_value = (dst >> bit_num) & 1
+                try self.func.emitLocalGet(dst);
+                try self.func.emitLocalGet(src);
+                try self.func.emitI32Const(31);
+                try self.func.emit(.i32_and);
+                try self.func.emit(.i32_shr_u);
+                try self.func.emitI32Const(1);
+                try self.func.emit(.i32_and);
+                
+                // Z = !bit_value
+                try self.func.emit(.i32_eqz);
+                try self.func.emitLocalSet(Reg.FLAG_Z);
+            } else {
+                // Bit number immediate
+                const bit_num = instr.src_imm orelse return error.InvalidInstruction;
+                
+                try self.func.emitLocalGet(dst);
+                try self.func.emitI32Const(bit_num);
+                try self.func.emit(.i32_shr_u);
+                try self.func.emitI32Const(1);
+                try self.func.emit(.i32_and);
+                
+                try self.func.emit(.i32_eqz);
+                try self.func.emitLocalSet(Reg.FLAG_Z);
+            }
+        } else {
+            return error.UnsupportedEAMode;
+        }
+    }
+    
+    /// BSET - Set bit
+    fn translateBSET(self: *Translator, instr: Instruction) !void {
+        // BSET Dn, <ea>  or  BSET #imm, <ea>
+        // Test bit (set Z), then set bit to 1
+        
+        if (instr.dst_mode == .DataRegDirect) {
+            const dst = Reg.dataReg(instr.dst_reg);
+            
+            if (instr.src_mode == .DataRegDirect) {
+                const src = Reg.dataReg(instr.src_reg);
+                
+                // bit_num = src & 31
+                // Test current bit
+                try self.func.emitLocalGet(dst);
+                try self.func.emitLocalGet(src);
+                try self.func.emitI32Const(31);
+                try self.func.emit(.i32_and);
+                const bit_num = try self.func.addLocal(.i32);
+                try self.func.emitLocalSet(bit_num);
+                
+                try self.func.emitLocalGet(bit_num);
+                try self.func.emit(.i32_shr_u);
+                try self.func.emitI32Const(1);
+                try self.func.emit(.i32_and);
+                try self.func.emit(.i32_eqz);
+                try self.func.emitLocalSet(Reg.FLAG_Z);
+                
+                // Set bit: dst |= (1 << bit_num)
+                try self.func.emitLocalGet(dst);
+                try self.func.emitI32Const(1);
+                try self.func.emitLocalGet(bit_num);
+                try self.func.emit(.i32_shl);
+                try self.func.emit(.i32_or);
+                try self.func.emitLocalSet(dst);
+            } else {
+                const bit_num = instr.src_imm orelse return error.InvalidInstruction;
+                
+                // Test
+                try self.func.emitLocalGet(dst);
+                try self.func.emitI32Const(bit_num);
+                try self.func.emit(.i32_shr_u);
+                try self.func.emitI32Const(1);
+                try self.func.emit(.i32_and);
+                try self.func.emit(.i32_eqz);
+                try self.func.emitLocalSet(Reg.FLAG_Z);
+                
+                // Set
+                try self.func.emitLocalGet(dst);
+                try self.func.emitI32Const(1 << @intCast(bit_num));
+                try self.func.emit(.i32_or);
+                try self.func.emitLocalSet(dst);
+            }
+        } else {
+            return error.UnsupportedEAMode;
+        }
+    }
+    
+    /// BCLR - Clear bit
+    fn translateBCLR(self: *Translator, instr: Instruction) !void {
+        // BCLR Dn, <ea>  or  BCLR #imm, <ea>
+        // Test bit (set Z), then clear bit to 0
+        
+        if (instr.dst_mode == .DataRegDirect) {
+            const dst = Reg.dataReg(instr.dst_reg);
+            
+            if (instr.src_mode == .DataRegDirect) {
+                const src = Reg.dataReg(instr.src_reg);
+                
+                // bit_num = src & 31
+                try self.func.emitLocalGet(dst);
+                try self.func.emitLocalGet(src);
+                try self.func.emitI32Const(31);
+                try self.func.emit(.i32_and);
+                const bit_num = try self.func.addLocal(.i32);
+                try self.func.emitLocalSet(bit_num);
+                
+                // Test
+                try self.func.emitLocalGet(bit_num);
+                try self.func.emit(.i32_shr_u);
+                try self.func.emitI32Const(1);
+                try self.func.emit(.i32_and);
+                try self.func.emit(.i32_eqz);
+                try self.func.emitLocalSet(Reg.FLAG_Z);
+                
+                // Clear bit: dst &= ~(1 << bit_num)
+                try self.func.emitLocalGet(dst);
+                try self.func.emitI32Const(1);
+                try self.func.emitLocalGet(bit_num);
+                try self.func.emit(.i32_shl);
+                try self.func.emitI32Const(-1);
+                try self.func.emit(.i32_xor); // NOT
+                try self.func.emit(.i32_and);
+                try self.func.emitLocalSet(dst);
+            } else {
+                const bit_num = instr.src_imm orelse return error.InvalidInstruction;
+                
+                // Test
+                try self.func.emitLocalGet(dst);
+                try self.func.emitI32Const(bit_num);
+                try self.func.emit(.i32_shr_u);
+                try self.func.emitI32Const(1);
+                try self.func.emit(.i32_and);
+                try self.func.emit(.i32_eqz);
+                try self.func.emitLocalSet(Reg.FLAG_Z);
+                
+                // Clear
+                try self.func.emitLocalGet(dst);
+                try self.func.emitI32Const(~(@as(i32, 1) << @intCast(bit_num)));
+                try self.func.emit(.i32_and);
+                try self.func.emitLocalSet(dst);
+            }
+        } else {
+            return error.UnsupportedEAMode;
+        }
+    }
+    
+    /// BCHG - Change (toggle) bit
+    fn translateBCHG(self: *Translator, instr: Instruction) !void {
+        // BCHG Dn, <ea>  or  BCHG #imm, <ea>
+        // Test bit (set Z), then toggle bit
+        
+        if (instr.dst_mode == .DataRegDirect) {
+            const dst = Reg.dataReg(instr.dst_reg);
+            
+            if (instr.src_mode == .DataRegDirect) {
+                const src = Reg.dataReg(instr.src_reg);
+                
+                // bit_num = src & 31
+                try self.func.emitLocalGet(dst);
+                try self.func.emitLocalGet(src);
+                try self.func.emitI32Const(31);
+                try self.func.emit(.i32_and);
+                const bit_num = try self.func.addLocal(.i32);
+                try self.func.emitLocalSet(bit_num);
+                
+                // Test
+                try self.func.emitLocalGet(bit_num);
+                try self.func.emit(.i32_shr_u);
+                try self.func.emitI32Const(1);
+                try self.func.emit(.i32_and);
+                try self.func.emit(.i32_eqz);
+                try self.func.emitLocalSet(Reg.FLAG_Z);
+                
+                // Toggle bit: dst ^= (1 << bit_num)
+                try self.func.emitLocalGet(dst);
+                try self.func.emitI32Const(1);
+                try self.func.emitLocalGet(bit_num);
+                try self.func.emit(.i32_shl);
+                try self.func.emit(.i32_xor);
+                try self.func.emitLocalSet(dst);
+            } else {
+                const bit_num = instr.src_imm orelse return error.InvalidInstruction;
+                
+                // Test
+                try self.func.emitLocalGet(dst);
+                try self.func.emitI32Const(bit_num);
+                try self.func.emit(.i32_shr_u);
+                try self.func.emitI32Const(1);
+                try self.func.emit(.i32_and);
+                try self.func.emit(.i32_eqz);
+                try self.func.emitLocalSet(Reg.FLAG_Z);
+                
+                // Toggle
+                try self.func.emitLocalGet(dst);
+                try self.func.emitI32Const(1 << @intCast(bit_num));
+                try self.func.emit(.i32_xor);
+                try self.func.emitLocalSet(dst);
+            }
+        } else {
+            return error.UnsupportedEAMode;
+        }
+    }
+    
+    /// TAS - Test and set (atomic)
+    fn translateTAS(self: *Translator, instr: Instruction) !void {
+        // TAS <ea>
+        // Test byte, set flags, then set bit 7 (MSB) to 1
+        // Used for semaphores in multiprocessing
+        
+        if (instr.dst_mode == .DataRegDirect) {
+            const dst = Reg.dataReg(instr.dst_reg);
+            
+            // Test current value (byte)
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(0xFF);
+            try self.func.emit(.i32_and);
+            const byte_val = try self.func.addLocal(.i32);
+            try self.func.emitLocalSet(byte_val);
+            
+            // Set flags based on byte value
+            // N = bit 7
+            try self.func.emitLocalGet(byte_val);
+            try self.func.emitI32Const(0x80);
+            try self.func.emit(.i32_and);
+            try self.func.emit(.i32_eqz);
+            try self.func.emit(.i32_eqz); // double negation
+            try self.func.emitLocalSet(Reg.FLAG_N);
+            
+            // Z = (byte == 0)
+            try self.func.emitLocalGet(byte_val);
+            try self.func.emit(.i32_eqz);
+            try self.func.emitLocalSet(Reg.FLAG_Z);
+            
+            // V = 0, C = 0
+            try self.func.emitI32Const(0);
+            try self.func.emitLocalSet(Reg.FLAG_V);
+            try self.func.emitI32Const(0);
+            try self.func.emitLocalSet(Reg.FLAG_C);
+            
+            // Set bit 7: dst |= 0x80
+            try self.func.emitLocalGet(dst);
+            try self.func.emitI32Const(0x80);
+            try self.func.emit(.i32_or);
+            try self.func.emitLocalSet(dst);
+        } else {
+            // Memory operand
+            // TODO: Implement atomic memory access
+            return error.UnsupportedEAMode;
+        }
     }
     
     /// NOP → nothing
@@ -576,6 +1433,62 @@ pub const Translator = struct {
         try self.func.emitLocalSet(Reg.A7);
     }
     
+    /// LINK - Link and allocate stack frame
+    fn translateLINK(self: *Translator, instr: Instruction) !void {
+        // LINK An, #displacement
+        // 1. Push An to stack
+        // 2. An = SP
+        // 3. SP = SP + displacement
+        
+        const an = Reg.addrReg(instr.dst_reg);
+        const disp = instr.disp orelse return error.InvalidInstruction;
+        
+        // Push An: SP -= 4
+        try self.func.emitLocalGet(Reg.A7);
+        try self.func.emitI32Const(-4);
+        try self.func.emit(.i32_add);
+        try self.func.emitLocalSet(Reg.A7);
+        
+        // Store An at (SP)
+        try self.func.emitLocalGet(Reg.A7);
+        try self.func.emitLocalGet(an);
+        try self.func.emit(.i32_store);
+        
+        // An = SP
+        try self.func.emitLocalGet(Reg.A7);
+        try self.func.emitLocalSet(an);
+        
+        // SP = SP + displacement (usually negative to allocate)
+        try self.func.emitLocalGet(Reg.A7);
+        try self.func.emitI32Const(disp);
+        try self.func.emit(.i32_add);
+        try self.func.emitLocalSet(Reg.A7);
+    }
+    
+    /// UNLK - Unlink (restore stack frame)
+    fn translateUNLK(self: *Translator, instr: Instruction) !void {
+        // UNLK An
+        // 1. SP = An
+        // 2. Pop An from stack
+        
+        const an = Reg.addrReg(instr.dst_reg);
+        
+        // SP = An
+        try self.func.emitLocalGet(an);
+        try self.func.emitLocalSet(Reg.A7);
+        
+        // Pop An: An = *(SP)
+        try self.func.emitLocalGet(Reg.A7);
+        try self.func.emit(.i32_load);
+        try self.func.emitLocalSet(an);
+        
+        // SP += 4
+        try self.func.emitLocalGet(Reg.A7);
+        try self.func.emitI32Const(4);
+        try self.func.emit(.i32_add);
+        try self.func.emitLocalSet(Reg.A7);
+    }
+    
     /// LEA - Load Effective Address
     fn translateLEA(self: *Translator, instr: Instruction) !void {
         // LEA <ea>, An
@@ -689,6 +1602,25 @@ pub const Translator = struct {
             try self.func.emitI32Const(16);
             try self.func.emit(.i32_shr_s);
         }
+        
+        try self.func.emitLocalSet(dn);
+        
+        // Update flags
+        try self.updateFlagsNZ(dn);
+    }
+    
+    /// EXTB - Sign extend byte to long (68020)
+    fn translateEXTB(self: *Translator, instr: Instruction) !void {
+        // EXTB.L Dn
+        // Sign extend byte (bit 7) to long (bits 8-31)
+        const dn = Reg.dataReg(instr.dst_reg);
+        
+        // Shift left 24 to move bit 7 to bit 31, then arithmetic shift right
+        try self.func.emitLocalGet(dn);
+        try self.func.emitI32Const(24);
+        try self.func.emit(.i32_shl);
+        try self.func.emitI32Const(24);
+        try self.func.emit(.i32_shr_s);
         
         try self.func.emitLocalSet(dn);
         

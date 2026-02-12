@@ -8,10 +8,10 @@
 
 ---
 
-## 데이터 이동 (Data Movement) - 7/18
+## 데이터 이동 (Data Movement) - 11/18
 
 - [x] MOVE - Move data
-- [ ] MOVEA - Move address
+- [x] MOVEA - Move address
 - [x] MOVEQ - Move quick (immediate)
 - [ ] MOVEM - Move multiple registers
 - [ ] MOVEP - Move peripheral data
@@ -20,23 +20,23 @@
 - [x] EXG - Exchange registers
 - [x] SWAP - Swap register halves
 - [x] EXT - Sign extend
-- [ ] EXTB - Sign extend byte to long (68020)
-- [ ] LINK - Link and allocate
-- [ ] UNLK - Unlink
+- [x] EXTB - Sign extend byte to long (68020)
+- [x] LINK - Link and allocate
+- [x] UNLK - Unlink
 
 ---
 
-## 산술 연산 (Integer Arithmetic) - 2/25
+## 산술 연산 (Integer Arithmetic) - 10/25
 
 - [x] ADD - Add
 - [ ] ADDA - Add address
-- [ ] ADDI - Add immediate
-- [ ] ADDQ - Add quick
+- [x] ADDI - Add immediate
+- [x] ADDQ - Add quick
 - [ ] ADDX - Add extended
 - [x] SUB - Subtract
 - [ ] SUBA - Subtract address
-- [ ] SUBI - Subtract immediate
-- [ ] SUBQ - Subtract quick
+- [x] SUBI - Subtract immediate
+- [x] SUBQ - Subtract quick
 - [ ] SUBX - Subtract extended
 - [ ] MULS - Signed multiply (16/32-bit)
 - [ ] MULU - Unsigned multiply (16/32-bit)
@@ -44,49 +44,49 @@
 - [ ] DIVU - Unsigned divide
 - [ ] DIVSL - Signed divide long (68020)
 - [ ] DIVUL - Unsigned divide long (68020)
-- [ ] NEG - Negate
+- [x] NEG - Negate
 - [ ] NEGX - Negate with extend
-- [ ] CLR - Clear
-- [ ] CMP - Compare
+- [x] CLR - Clear
+- [x] CMP - Compare
 - [ ] CMPA - Compare address
-- [ ] CMPI - Compare immediate
+- [x] CMPI - Compare immediate
 - [ ] CMPM - Compare memory
-- [ ] TST - Test
+- [x] TST - Test
 
 ---
 
-## 논리 연산 (Logical) - 3/8
+## 논리 연산 (Logical) - 8/8 ✅
 
 - [x] AND - Logical AND
-- [ ] ANDI - AND immediate
+- [x] ANDI - AND immediate
 - [x] OR - Logical OR
-- [ ] ORI - OR immediate
+- [x] ORI - OR immediate
 - [x] EOR - Logical exclusive OR
-- [ ] EORI - EOR immediate
-- [ ] NOT - Logical complement
+- [x] EORI - EOR immediate
+- [x] NOT - Logical complement
 
 ---
 
-## 시프트/로테이트 (Shift and Rotate) - 0/8
+## 시프트/로테이트 (Shift and Rotate) - 8/8 ✅
 
-- [ ] ASL - Arithmetic shift left
-- [ ] ASR - Arithmetic shift right
-- [ ] LSL - Logical shift left
-- [ ] LSR - Logical shift right
-- [ ] ROL - Rotate left
-- [ ] ROR - Rotate right
-- [ ] ROXL - Rotate left with extend
-- [ ] ROXR - Rotate right with extend
+- [x] ASL - Arithmetic shift left
+- [x] ASR - Arithmetic shift right
+- [x] LSL - Logical shift left
+- [x] LSR - Logical shift right
+- [x] ROL - Rotate left
+- [x] ROR - Rotate right
+- [x] ROXL - Rotate left with extend
+- [x] ROXR - Rotate right with extend
 
 ---
 
-## 비트 조작 (Bit Manipulation) - 0/13
+## 비트 조작 (Bit Manipulation) - 5/13
 
 ### 기본 (68000)
-- [ ] BTST - Test bit
-- [ ] BSET - Set bit
-- [ ] BCLR - Clear bit
-- [ ] BCHG - Change bit
+- [x] BTST - Test bit
+- [x] BSET - Set bit
+- [x] BCLR - Clear bit
+- [x] BCHG - Change bit
 
 ### 비트 필드 (68020)
 - [ ] BFCHG - Bit field change
@@ -99,7 +99,7 @@
 - [ ] BFTST - Bit field test
 
 ### 특수
-- [ ] TAS - Test and set
+- [x] TAS - Test and set
 
 ---
 
@@ -249,24 +249,35 @@
 
 | 카테고리 | 완료 | 전체 | 진행률 |
 |---------|------|------|--------|
-| 데이터 이동 | 7 | 18 | 39% |
-| 산술 연산 | 2 | 25 | 8% |
-| 논리 연산 | 3 | 8 | 38% |
-| 시프트/로테이트 | 0 | 8 | 0% |
-| 비트 조작 | 0 | 13 | 0% |
+| 데이터 이동 | 11 | 18 | 61% |
+| 산술 연산 | 10 | 25 | 40% |
+| 논리 연산 | 8 | 8 | **100%** ✅ |
+| 시프트/로테이트 | 8 | 8 | **100%** ✅ |
+| 비트 조작 | 5 | 13 | 38% |
 | 프로그램 제어 | 3 | 35 | 9% |
 | 시스템 제어 | 2 | 15 | 13% |
 | 어드레싱 모드 | 5 | 18 | 28% |
 | 예외 처리 | 0 | 14 | 0% |
 | 시스템 레지스터 | 0 | 10 | 0% |
-| **전체** | **17** | **164** | **10%** |
+| **전체** | **47** | **164** | **29%** |
 
 ---
 
 **목표**: 164개 항목 모두 체크 = 68020 완전 구현!
 
-**현재**: Phase 3.2 완료
-**다음**: Phase 3.3 - 데이터 이동 완성 (11개 추가)
+**현재**: Phase 3.6 진행 중
+**완료**: 
+- ✅ 논리 연산 8/8 (100%)
+- ✅ 시프트/로테이트 8/8 (100%)
+- 🔄 비트 조작 4/13 (31% - 기본 완료)
+- 🔄 데이터 이동 11/18 (61%)
+- 🔄 산술 연산 10/25 (40%)
+
+**다음**: TAS 구현 또는 프로그램 제어 그룹 시작
 
 **작성일**: 2026-02-12
-**마지막 업데이트**: 2026-02-12 16:30
+**마지막 업데이트**: 2026-02-12 17:30
+
+
+
+
