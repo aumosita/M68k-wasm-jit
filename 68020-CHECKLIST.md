@@ -26,18 +26,18 @@
 
 ---
 
-## 산술 연산 (Integer Arithmetic) - 10/25
+## 산술 연산 (Integer Arithmetic) - 17/25
 
 - [x] ADD - Add
-- [ ] ADDA - Add address
+- [x] ADDA - Add address
 - [x] ADDI - Add immediate
 - [x] ADDQ - Add quick
-- [ ] ADDX - Add extended
+- [x] ADDX - Add extended
 - [x] SUB - Subtract
-- [ ] SUBA - Subtract address
+- [x] SUBA - Subtract address
 - [x] SUBI - Subtract immediate
 - [x] SUBQ - Subtract quick
-- [ ] SUBX - Subtract extended
+- [x] SUBX - Subtract extended
 - [ ] MULS - Signed multiply (16/32-bit)
 - [ ] MULU - Unsigned multiply (16/32-bit)
 - [ ] DIVS - Signed divide
@@ -45,12 +45,12 @@
 - [ ] DIVSL - Signed divide long (68020)
 - [ ] DIVUL - Unsigned divide long (68020)
 - [x] NEG - Negate
-- [ ] NEGX - Negate with extend
+- [x] NEGX - Negate with extend
 - [x] CLR - Clear
 - [x] CMP - Compare
-- [ ] CMPA - Compare address
+- [x] CMPA - Compare address
 - [x] CMPI - Compare immediate
-- [ ] CMPM - Compare memory
+- [x] CMPM - Compare memory
 - [x] TST - Test
 
 ---
@@ -250,7 +250,7 @@
 | 카테고리 | 완료 | 전체 | 진행률 |
 |---------|------|------|--------|
 | 데이터 이동 | 11 | 18 | 61% |
-| 산술 연산 | 10 | 25 | 40% |
+| 산술 연산 | 17 | 25 | 68% |
 | 논리 연산 | 8 | 8 | **100%** ✅ |
 | 시프트/로테이트 | 8 | 8 | **100%** ✅ |
 | 비트 조작 | 5 | 13 | 38% |
@@ -259,24 +259,25 @@
 | 어드레싱 모드 | 5 | 18 | 28% |
 | 예외 처리 | 0 | 14 | 0% |
 | 시스템 레지스터 | 0 | 10 | 0% |
-| **전체** | **47** | **164** | **29%** |
+| **전체** | **54** | **164** | **33%** |
 
 ---
 
 **목표**: 164개 항목 모두 체크 = 68020 완전 구현!
 
-**현재**: Phase 3.6 진행 중
+**현재**: Phase 3 진행 중
 **완료**: 
 - ✅ 논리 연산 8/8 (100%)
 - ✅ 시프트/로테이트 8/8 (100%)
-- 🔄 비트 조작 4/13 (31% - 기본 완료)
+- 🔄 산술 연산 17/25 (68% - 거의 완성!)
 - 🔄 데이터 이동 11/18 (61%)
-- 🔄 산술 연산 10/25 (40%)
+- 🔄 비트 조작 5/13 (38%)
 
-**다음**: TAS 구현 또는 프로그램 제어 그룹 시작
+**다음**: 산술 연산 나머지 8개 (곱셈/나눗셈) 또는 프로그램 제어
 
 **작성일**: 2026-02-12
-**마지막 업데이트**: 2026-02-12 17:30
+**마지막 업데이트**: 2026-02-12 17:35
+
 
 
 

@@ -112,16 +112,23 @@ pub const Translator = struct {
             .EXT => try self.translateEXT(instr),
             .EXTB => try self.translateEXTB(instr),
             .ADD => try self.translateADD(instr),
+            .ADDA => try self.translateADDA(instr),
             .ADDI => try self.translateADDI(instr),
             .ADDQ => try self.translateADDQ(instr),
+            .ADDX => try self.translateADDX(instr),
             .SUB => try self.translateSUB(instr),
+            .SUBA => try self.translateSUBA(instr),
             .SUBI => try self.translateSUBI(instr),
             .SUBQ => try self.translateSUBQ(instr),
+            .SUBX => try self.translateSUBX(instr),
             .CLR => try self.translateCLR(instr),
             .NEG => try self.translateNEG(instr),
+            .NEGX => try self.translateNEGX(instr),
             .TST => try self.translateTST(instr),
             .CMP => try self.translateCMP(instr),
+            .CMPA => try self.translateCMPA(instr),
             .CMPI => try self.translateCMPI(instr),
+            .CMPM => try self.translateCMPM(instr),
             .AND => try self.translateAND(instr),
             .ANDI => try self.translateANDI(instr),
             .OR => try self.translateOR(instr),
@@ -402,6 +409,31 @@ pub const Translator = struct {
         // TODO: C, V flags
     }
     
+    /// ADDA - Add to address register (no flags)
+    fn translateADDA(self: *Translator, instr: Instruction) !void {
+        // ADDA <ea>, An
+        // Add to address register, no flag updates
+        const dst = Reg.addrReg(instr.dst_reg);
+        
+        // Load source
+        try self.loadEA(instr.src_mode, instr.src_reg, instr.size);
+        
+        // Sign-extend if Word size
+        if (instr.size == .Word) {
+            try self.func.emitI32Const(16);
+            try self.func.emit(.i32_shl);
+            try self.func.emitI32Const(16);
+            try self.func.emit(.i32_shr_s);
+        }
+        
+        // An = An + src
+        try self.func.emitLocalGet(dst);
+        try self.func.emit(.i32_add);
+        try self.func.emitLocalSet(dst);
+        
+        // No flag updates for ADDA
+    }
+    
     /// ADDI - Add immediate
     fn translateADDI(self: *Translator, instr: Instruction) !void {
         // ADDI #imm, <ea>
@@ -452,6 +484,30 @@ pub const Translator = struct {
         }
     }
     
+    /// ADDX - Add extended (with X flag)
+    fn translateADDX(self: *Translator, instr: Instruction) !void {
+        // ADDX Dx, Dy  or  ADDX -(Ax), -(Ay)
+        // dst = dst + src + X
+        
+        if (instr.src_mode == .DataRegDirect) {
+            const src = Reg.dataReg(instr.src_reg);
+            const dst = Reg.dataReg(instr.dst_reg);
+            
+            // dst = dst + src + X
+            try self.func.emitLocalGet(dst);
+            try self.func.emitLocalGet(src);
+            try self.func.emit(.i32_add);
+            try self.func.emitLocalGet(Reg.FLAG_X);
+            try self.func.emit(.i32_add);
+            try self.func.emitLocalSet(dst);
+            
+            try self.updateFlagsNZ(dst);
+            // TODO: C, V, X flags properly
+        } else {
+            return error.UnsupportedEAMode;
+        }
+    }
+    
     /// SUB Dn, Dm
     fn translateSUB(self: *Translator, instr: Instruction) !void {
         const src = Reg.dataReg(instr.src_reg);
@@ -463,6 +519,31 @@ pub const Translator = struct {
         try self.func.emitLocalSet(dst);
         
         try self.updateFlagsNZ(dst);
+    }
+    
+    /// SUBA - Subtract from address register (no flags)
+    fn translateSUBA(self: *Translator, instr: Instruction) !void {
+        // SUBA <ea>, An
+        // Subtract from address register, no flag updates
+        const dst = Reg.addrReg(instr.dst_reg);
+        
+        // Load source
+        try self.loadEA(instr.src_mode, instr.src_reg, instr.size);
+        
+        // Sign-extend if Word size
+        if (instr.size == .Word) {
+            try self.func.emitI32Const(16);
+            try self.func.emit(.i32_shl);
+            try self.func.emitI32Const(16);
+            try self.func.emit(.i32_shr_s);
+        }
+        
+        // An = An - src
+        try self.func.emitLocalGet(dst);
+        try self.func.emit(.i32_sub);
+        try self.func.emitLocalSet(dst);
+        
+        // No flag updates for SUBA
     }
     
     /// SUBI - Subtract immediate
@@ -513,6 +594,30 @@ pub const Translator = struct {
         }
     }
     
+    /// SUBX - Subtract extended (with X flag)
+    fn translateSUBX(self: *Translator, instr: Instruction) !void {
+        // SUBX Dx, Dy  or  SUBX -(Ax), -(Ay)
+        // dst = dst - src - X
+        
+        if (instr.src_mode == .DataRegDirect) {
+            const src = Reg.dataReg(instr.src_reg);
+            const dst = Reg.dataReg(instr.dst_reg);
+            
+            // dst = dst - src - X
+            try self.func.emitLocalGet(dst);
+            try self.func.emitLocalGet(src);
+            try self.func.emit(.i32_sub);
+            try self.func.emitLocalGet(Reg.FLAG_X);
+            try self.func.emit(.i32_sub);
+            try self.func.emitLocalSet(dst);
+            
+            try self.updateFlagsNZ(dst);
+            // TODO: C, V, X flags properly
+        } else {
+            return error.UnsupportedEAMode;
+        }
+    }
+    
     /// CLR - Clear operand (set to zero)
     fn translateCLR(self: *Translator, instr: Instruction) !void {
         // CLR <ea>
@@ -546,6 +651,29 @@ pub const Translator = struct {
             // dst = 0 - dst
             try self.func.emitI32Const(0);
             try self.func.emitLocalGet(dst);
+            try self.func.emit(.i32_sub);
+            try self.func.emitLocalSet(dst);
+            
+            try self.updateFlagsNZ(dst);
+            // TODO: C, V, X flags
+        } else {
+            return error.UnsupportedEAMode;
+        }
+    }
+    
+    /// NEGX - Negate with extend (0 - operand - X)
+    fn translateNEGX(self: *Translator, instr: Instruction) !void {
+        // NEGX <ea>
+        // dst = 0 - dst - X
+        
+        if (instr.dst_mode == .DataRegDirect) {
+            const dst = Reg.dataReg(instr.dst_reg);
+            
+            // dst = 0 - dst - X
+            try self.func.emitI32Const(0);
+            try self.func.emitLocalGet(dst);
+            try self.func.emit(.i32_sub);
+            try self.func.emitLocalGet(Reg.FLAG_X);
             try self.func.emit(.i32_sub);
             try self.func.emitLocalSet(dst);
             
@@ -598,6 +726,35 @@ pub const Translator = struct {
         // TODO: C, V flags
     }
     
+    /// CMPA - Compare address
+    fn translateCMPA(self: *Translator, instr: Instruction) !void {
+        // CMPA <ea>, An
+        // Compute An - src, update flags only (no store)
+        const dst = Reg.addrReg(instr.dst_reg);
+        
+        // Load source
+        try self.loadEA(instr.src_mode, instr.src_reg, instr.size);
+        
+        // Sign-extend if Word size
+        if (instr.size == .Word) {
+            try self.func.emitI32Const(16);
+            try self.func.emit(.i32_shl);
+            try self.func.emitI32Const(16);
+            try self.func.emit(.i32_shr_s);
+        }
+        
+        // Compute An - src
+        try self.func.emitLocalGet(dst);
+        try self.func.emit(.i32_sub);
+        
+        // Store in temp
+        const temp = try self.func.addLocal(.i32);
+        try self.func.emitLocalSet(temp);
+        
+        try self.updateFlagsNZ(temp);
+        // TODO: C, V flags
+    }
+    
     /// CMPI - Compare immediate
     fn translateCMPI(self: *Translator, instr: Instruction) !void {
         // CMPI #imm, <ea>
@@ -612,6 +769,47 @@ pub const Translator = struct {
             try self.func.emit(.i32_sub);
             
             // Store in temp
+            const temp = try self.func.addLocal(.i32);
+            try self.func.emitLocalSet(temp);
+            
+            try self.updateFlagsNZ(temp);
+        } else {
+            return error.UnsupportedEAMode;
+        }
+    }
+    
+    /// CMPM - Compare memory
+    fn translateCMPM(self: *Translator, instr: Instruction) !void {
+        // CMPM (Ax)+, (Ay)+
+        // Compare memory with post-increment on both
+        
+        if (instr.src_mode == .AddrRegIndirectPost and instr.dst_mode == .AddrRegIndirectPost) {
+            const src_reg = Reg.addrReg(instr.src_reg);
+            const dst_reg = Reg.addrReg(instr.dst_reg);
+            
+            // Load src value from (Ax)+
+            try self.func.emitLocalGet(src_reg);
+            try self.emitMemoryLoad(instr.size);
+            
+            // Increment Ax
+            try self.func.emitLocalGet(src_reg);
+            try self.func.emitI32Const(@as(i32, instr.size.bytes()));
+            try self.func.emit(.i32_add);
+            try self.func.emitLocalSet(src_reg);
+            
+            // Load dst value from (Ay)+
+            try self.func.emitLocalGet(dst_reg);
+            try self.emitMemoryLoad(instr.size);
+            
+            // Increment Ay
+            try self.func.emitLocalGet(dst_reg);
+            try self.func.emitI32Const(@as(i32, instr.size.bytes()));
+            try self.func.emit(.i32_add);
+            try self.func.emitLocalSet(dst_reg);
+            
+            // Compare: dst - src
+            try self.func.emit(.i32_sub);
+            
             const temp = try self.func.addLocal(.i32);
             try self.func.emitLocalSet(temp);
             
