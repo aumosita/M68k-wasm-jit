@@ -479,6 +479,32 @@ pub const Decoder = struct {
             };
         }
         
+        // MOVEM reg→mem: 0100 1000 1zxxxxxx
+        // MOVEM mem→reg: 0100 1100 1zxxxxxx
+        if ((opcode & 0xFB80) == 0x4880) {
+            const dir = (opcode >> 10) & 1; // 0=reg→mem, 1=mem→reg
+            const size_bit = (opcode >> 6) & 1; // 0=Word, 1=Long
+            const mode = @as(u3, @truncate((opcode >> 3) & 0x7));
+            const reg = @as(u3, @truncate(opcode & 0x7));
+            
+            return .{
+                .op = .MOVEM,
+                .size = if (size_bit == 0) .Word else .Long,
+                .src_mode = if (dir == 0) .DataRegDirect else @enumFromInt(mode),
+                .src_reg = if (dir == 0) 0 else reg,
+                .src_imm = null,
+                .dst_mode = if (dir == 0) @enumFromInt(mode) else .DataRegDirect,
+                .dst_reg = if (dir == 0) reg else 0,
+                .dst_imm = null,
+                .disp = null,
+                .condition = @as(u4, @truncate(dir)),  // 임시로 방향 저장
+                .reg_mask = 0,  // 다음 워드에서 읽어야 함
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 4,  // opcode + mask word
+            };
+        }
+        
         // EXT/EXTB: 0100100xxx000xxx
         if ((opcode & 0xFEB8) == 0x4880) {
             const op_mode = (opcode >> 6) & 0x7;
@@ -1010,31 +1036,53 @@ pub const Decoder = struct {
     fn decodeShift(opcode: u16) Instruction {
         const direction = (opcode >> 8) & 1; // 0=right, 1=left
         const type_ = (opcode >> 3) & 0x3;
+        const is_register_shift = ((opcode >> 5) & 1) == 1;
         
         const op: Operation = switch (type_) {
             0 => if (direction == 0) .ASR else .ASL,
             1 => if (direction == 0) .LSR else .LSL,
-            2 => if (direction == 0) .ROR else .ROL,
-            3 => if (direction == 0) .ROXR else .ROXL,
+            2 => if (direction == 0) .ROXR else .ROXL,  // ROX (with extend)
+            3 => if (direction == 0) .ROR else .ROL,     // RO (normal rotate)
             else => .ILLEGAL,
         };
         
-        return .{
-            .op = op,
-            .size = getSizeFromBits((opcode >> 6) & 0x3),
-            .src_mode = .Immediate,
-            .src_reg = 0,
-            .src_imm = @as(i32, @as(u3, @truncate((opcode >> 9) & 0x7))),
-            .dst_mode = .DataRegDirect,
-            .dst_reg = @as(u3, @truncate(opcode & 0x7)),
-            .dst_imm = null,
-            .disp = null,
-            .condition = 0,
-            .reg_mask = 0,
-            .bf_offset = 0,
-            .bf_width = 0,
-            .length = 2,
-        };
+        if (is_register_shift) {
+            // Register shift: Dreg,Dn
+            return .{
+                .op = op,
+                .size = getSizeFromBits((opcode >> 6) & 0x3),
+                .src_mode = .DataRegDirect,
+                .src_reg = @as(u3, @truncate((opcode >> 9) & 0x7)),
+                .src_imm = null,
+                .dst_mode = .DataRegDirect,
+                .dst_reg = @as(u3, @truncate(opcode & 0x7)),
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 2,
+            };
+        } else {
+            // Immediate shift: #count,Dn
+            return .{
+                .op = op,
+                .size = getSizeFromBits((opcode >> 6) & 0x3),
+                .src_mode = .Immediate,
+                .src_reg = 0,
+                .src_imm = @as(i32, @as(u3, @truncate((opcode >> 9) & 0x7))),
+                .dst_mode = .DataRegDirect,
+                .dst_reg = @as(u3, @truncate(opcode & 0x7)),
+                .dst_imm = null,
+                .disp = null,
+                .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
+                .length = 2,
+            };
+        }
     }
     
     fn decodeLogic(opcode: u16, op: Operation) Instruction {
