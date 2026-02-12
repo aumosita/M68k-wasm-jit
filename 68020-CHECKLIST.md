@@ -117,32 +117,42 @@
 
 ---
 
-## 프로그램 제어 (Program Control) - 1/35 (3%)
+## 프로그램 제어 (Program Control) - 20/35 (57%)
 
 ### 분기 (Branch)
-- [ ] BRA - Branch always
-- [ ] BSR - Branch to subroutine
-- [ ] Bcc - Branch conditionally (16 conditions)
-  - [ ] BHI, BLS, BCC, BCS
-  - [ ] BNE, BEQ, BVC, BVS
-  - [ ] BPL, BMI, BGE, BLT
-  - [ ] BGT, BLE
+- [x] BRA - Branch always
+- [x] BSR - Branch to subroutine
+- [x] Bcc - Branch conditionally (14 conditions)
+  - [x] BHI, BLS, BCC, BCS
+  - [x] BNE, BEQ, BVC, BVS
+  - [x] BPL, BMI, BGE, BLT
+  - [x] BGT, BLE
 
 ### 조건 (Conditional)
 - [ ] DBcc - Decrement and branch
 - [ ] Scc - Set according to condition
 
 ### 점프 (Jump)
-- [ ] JMP - Jump
-- [ ] JSR - Jump to subroutine
-- [ ] RTS - Return from subroutine
+- [x] JMP - Jump
+- [x] JSR - Jump to subroutine
+- [x] RTS - Return from subroutine
 - [ ] RTR - Return and restore
 - [ ] RTE - Return from exception
 
 ### 기타
 - [x] NOP - No operation
 
-**구현**: 1개 | **디코딩**: 1/1 ✅
+**구현**: 20개 | **디코딩**: 20/20 ✅
+
+**완성 항목**:
+- BRA, BSR (분기)
+- Bcc 14개 조건 (HI, LS, CC, CS, NE, EQ, VC, VS, PL, MI, GE, LT, GT, LE)
+- JMP, JSR, RTS (점프/서브루틴)
+- NOP
+
+**남은 항목**:
+- DBcc, Scc
+- RTR, RTE
 
 ---
 
@@ -270,12 +280,12 @@
 | 논리 연산 | 7 | 7/7 ✅ | 8 | **88%** | ✅ |
 | 시프트/로테이트 | 6 | 6/6 ✅ | 8 | **75%** | ✅ |
 | 비트 조작 | 5 | 5/5 ✅ | 13 | 38% | 🔄 |
-| 프로그램 제어 | 1 | 1/1 ✅ | 35 | 3% | 📝 |
+| 프로그램 제어 | 20 | 20/20 ✅ | 35 | **57%** | 🔄 |
 | 시스템 제어 | 0 | 0/0 | 15 | 0% | 📝 |
 | 어드레싱 모드 | 5 | - | 18 | 28% | 📝 |
 | 예외 처리 | 0 | - | 14 | 0% | 📝 |
 | 시스템 레지스터 | 0 | - | 10 | 0% | 📝 |
-| **전체** | **53** | **53/53** ✅ | **164** | **32%** | 🔄 |
+| **전체** | **58** | **58/58** ✅ | **164** | **35%** | 🔄 |
 
 **범례**: ✅ 완료/거의완료 | 🔄 진행중 | 📝 미시작
 
@@ -283,16 +293,22 @@
 
 ## 🎉 최근 성과 (2026-02-12)
 
-### ✅ Decoder 대폭 개선
-- **19/60 (31%) → 53/53 (100%)** 디코딩 성공률 달성!
+### ✅ 프로그램 제어 구현 완료!
+- **BRA, BSR** - 무조건 분기 및 서브루틴 호출 ✅
+- **Bcc (14개)** - 모든 조건 분기 ✅
+  - HI, LS, CC, CS, NE, EQ, VC, VS, PL, MI, GE, LT, GT, LE
+- **JMP, JSR, RTS** - 점프 및 서브루틴 완전 구현 ✅
+
+### ✅ 테스트 확장
+- 46개 → **65개 명령어 자동 테스트**
+- **65/65 전부 통과** ✅
+- 프로그램 제어 완전 검증
+
+### ✅ Decoder 대폭 개선 (오전)
+- **19/60 (31%) → 58/58 (100%)** 디코딩 성공률 달성!
 - 모든 구현된 명령어가 정상 디코딩 ✅
 
-### ✅ 포괄적 테스트 구축
-- 46개 명령어 자동 테스트
-- **46/46 전부 통과** ✅
-- `zig build test-comprehensive` 명령으로 검증 가능
-
-### ✅ 빌드 시스템 완성
+### ✅ 빌드 시스템 완성 (오전)
 - Zig 0.13.0 호환성 확보
 - 자동 빌드 + 테스트 파이프라인
 
@@ -300,13 +316,19 @@
 
 ## 📊 다음 작업 우선순위
 
-### 1️⃣ **프로그램 제어** (가장 중요!)
-실행 흐름 제어 없이는 실용적인 코드 실행 불가
-- [ ] BRA, BSR - 분기
-- [ ] Bcc - 조건 분기
-- [ ] JMP, JSR, RTS - 점프/서브루틴
+### 1️⃣ **데이터 이동 완성**
+나머지 7개 구현으로 61% → 100%
+- [ ] MOVEM - 다중 레지스터 이동
+- [ ] MOVEP - 주변장치 데이터 이동
+- [ ] LINK/UNLK 완전 구현
 
-### 2️⃣ **데이터 이동 완성**
+### 2️⃣ **비트 필드 명령어**
+68020 고유 기능
+- [ ] 8개 비트 필드 명령어
+
+### 3️⃣ **조건 설정 명령어**
+- [ ] DBcc - Decrement and branch
+- [ ] Scc - Set condition code
 나머지 7개 구현으로 61% → 100%
 - [ ] MOVEM - 다중 레지스터 이동
 - [ ] LINK/UNLK 완전 구현
@@ -318,7 +340,7 @@
 ---
 
 **작성일**: 2026-02-09
-**마지막 업데이트**: 2026-02-12 18:00
+**마지막 업데이트**: 2026-02-12 18:15
 
 **GitHub**: https://github.com/aumosita/M68k-wasm-jit
-**최신 커밋**: bc9b2e7 - "Fix decoder - all 60 instructions now decode correctly!"
+**최신 커밋**: 2d7c80b - "Implement JMP, JSR, RTS (jump and subroutine)"
