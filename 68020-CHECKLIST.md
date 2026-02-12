@@ -8,32 +8,32 @@
 
 ---
 
-## 데이터 이동 (Data Movement) - 0/18
+## 데이터 이동 (Data Movement) - 7/18
 
-- [ ] MOVE - Move data
+- [x] MOVE - Move data
 - [ ] MOVEA - Move address
-- [ ] MOVEQ - Move quick (immediate)
+- [x] MOVEQ - Move quick (immediate)
 - [ ] MOVEM - Move multiple registers
 - [ ] MOVEP - Move peripheral data
-- [ ] LEA - Load effective address
-- [ ] PEA - Push effective address
-- [ ] EXG - Exchange registers
-- [ ] SWAP - Swap register halves
-- [ ] EXT - Sign extend
+- [x] LEA - Load effective address
+- [x] PEA - Push effective address
+- [x] EXG - Exchange registers
+- [x] SWAP - Swap register halves
+- [x] EXT - Sign extend
 - [ ] EXTB - Sign extend byte to long (68020)
 - [ ] LINK - Link and allocate
 - [ ] UNLK - Unlink
 
 ---
 
-## 산술 연산 (Integer Arithmetic) - 0/25
+## 산술 연산 (Integer Arithmetic) - 2/25
 
-- [ ] ADD - Add
+- [x] ADD - Add
 - [ ] ADDA - Add address
 - [ ] ADDI - Add immediate
 - [ ] ADDQ - Add quick
 - [ ] ADDX - Add extended
-- [ ] SUB - Subtract
+- [x] SUB - Subtract
 - [ ] SUBA - Subtract address
 - [ ] SUBI - Subtract immediate
 - [ ] SUBQ - Subtract quick
@@ -55,13 +55,13 @@
 
 ---
 
-## 논리 연산 (Logical) - 0/8
+## 논리 연산 (Logical) - 3/8
 
-- [ ] AND - Logical AND
+- [x] AND - Logical AND
 - [ ] ANDI - AND immediate
-- [ ] OR - Logical OR
+- [x] OR - Logical OR
 - [ ] ORI - OR immediate
-- [ ] EOR - Logical exclusive OR
+- [x] EOR - Logical exclusive OR
 - [ ] EORI - EOR immediate
 - [ ] NOT - Logical complement
 
@@ -103,12 +103,12 @@
 
 ---
 
-## 프로그램 제어 (Program Control) - 1/35
+## 프로그램 제어 (Program Control) - 3/35
 
 ### 분기 (Branch)
-- [x] BRA - Branch always (구현됨)
+- [x] BRA - Branch always
 - [ ] BSR - Branch to subroutine
-- [ ] Bcc - Branch conditionally (16 conditions)
+- [x] Bcc - Branch conditionally (16 conditions)
   - [ ] BHI, BLS, BCC, BCS
   - [ ] BNE, BEQ, BVC, BVS
   - [ ] BPL, BMI, BGE, BLT
@@ -120,17 +120,17 @@
 
 ### 점프 (Jump)
 - [ ] JMP - Jump
-- [ ] JSR - Jump to subroutine
-- [ ] RTS - Return from subroutine
+- [x] JSR - Jump to subroutine
+- [x] RTS - Return from subroutine
 - [ ] RTR - Return and restore
 - [ ] RTE - Return from exception
 
 ### 기타
-- [x] NOP - No operation (구현됨)
+- [x] NOP - No operation
 
 ---
 
-## 시스템 제어 (System Control) - 0/15
+## 시스템 제어 (System Control) - 2/15
 
 ### 특권 명령어 (Privileged)
 - [ ] ANDI to SR - AND immediate to SR
@@ -249,22 +249,24 @@
 
 | 카테고리 | 완료 | 전체 | 진행률 |
 |---------|------|------|--------|
-| 데이터 이동 | 0 | 18 | 0% |
-| 산술 연산 | 0 | 25 | 0% |
-| 논리 연산 | 0 | 8 | 0% |
+| 데이터 이동 | 7 | 18 | 39% |
+| 산술 연산 | 2 | 25 | 8% |
+| 논리 연산 | 3 | 8 | 38% |
 | 시프트/로테이트 | 0 | 8 | 0% |
 | 비트 조작 | 0 | 13 | 0% |
-| 프로그램 제어 | 1 | 35 | 3% |
-| 시스템 제어 | 0 | 15 | 0% |
+| 프로그램 제어 | 3 | 35 | 9% |
+| 시스템 제어 | 2 | 15 | 13% |
 | 어드레싱 모드 | 5 | 18 | 28% |
 | 예외 처리 | 0 | 14 | 0% |
 | 시스템 레지스터 | 0 | 10 | 0% |
-| **전체** | **6** | **164** | **4%** |
+| **전체** | **17** | **164** | **10%** |
 
 ---
 
 **목표**: 164개 항목 모두 체크 = 68020 완전 구현!
 
-**현재**: Phase 1-2 완료, Phase 3 시작 전
+**현재**: Phase 3.2 완료
+**다음**: Phase 3.3 - 데이터 이동 완성 (11개 추가)
 
 **작성일**: 2026-02-12
+**마지막 업데이트**: 2026-02-12 16:30
