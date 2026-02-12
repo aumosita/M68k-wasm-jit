@@ -286,19 +286,21 @@ pub const Decoder = struct {
             .src_imm = null,
             .dst_mode = @enumFromInt(dst_mode),
             .dst_reg = dst_reg,
+            .dst_imm = null,
             .disp = null,
             .condition = 0,
+            .reg_mask = 0,
+            .bf_offset = 0,
+            .bf_width = 0,
             .length = 2,
         };
     }
     
     fn decodeGroup4(opcode: u16) Instruction {
         // Group 4: Miscellaneous instructions
-        const bits_6_11 = (opcode >> 6) & 0x3F;
-        const bits_3_5 = (opcode >> 3) & 0x7;
         
         // LEA: 0100xxx111xxxxxx
-        if (bits_6_11 == 0x39) {
+        if (((opcode >> 6) & 0x3F) == 0x39) {
             return .{
                 .op = .LEA,
                 .size = .Long,
@@ -436,8 +438,12 @@ pub const Decoder = struct {
                 .src_imm = getQuickData(opcode),
                 .dst_mode = @enumFromInt(@as(u3, @truncate((opcode >> 3) & 0x7))),
                 .dst_reg = @as(u3, @truncate(opcode & 0x7)),
+                .dst_imm = null,
                 .disp = null,
                 .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
                 .length = 2,
             };
         } else { // SUBQ
@@ -449,8 +455,12 @@ pub const Decoder = struct {
                 .src_imm = getQuickData(opcode),
                 .dst_mode = @enumFromInt(@as(u3, @truncate((opcode >> 3) & 0x7))),
                 .dst_reg = @as(u3, @truncate(opcode & 0x7)),
+                .dst_imm = null,
                 .disp = null,
                 .condition = 0,
+                .reg_mask = 0,
+                .bf_offset = 0,
+                .bf_width = 0,
                 .length = 2,
             };
         }
@@ -468,8 +478,12 @@ pub const Decoder = struct {
             .src_imm = null,
             .dst_mode = .DataRegDirect,
             .dst_reg = 0,
+            .dst_imm = null,
             .disp = if (disp8 == 0) 0 else @as(i16, disp8),
             .condition = condition,
+            .reg_mask = 0,
+            .bf_offset = 0,
+            .bf_width = 0,
             .length = 2,
         };
     }
@@ -486,8 +500,12 @@ pub const Decoder = struct {
             .src_imm = @as(i32, data), // Sign-extended
             .dst_mode = .DataRegDirect,
             .dst_reg = dst_reg,
+            .dst_imm = null,
             .disp = null,
             .condition = 0,
+            .reg_mask = 0,
+            .bf_offset = 0,
+            .bf_width = 0,
             .length = 2,
         };
     }
@@ -509,8 +527,12 @@ pub const Decoder = struct {
             .src_imm = null,
             .dst_mode = .DataRegDirect,
             .dst_reg = @as(u3, @truncate((opcode >> 9) & 0x7)),
+            .dst_imm = null,
             .disp = null,
             .condition = 0,
+            .reg_mask = 0,
+            .bf_offset = 0,
+            .bf_width = 0,
             .length = 2,
         };
     }
@@ -527,8 +549,12 @@ pub const Decoder = struct {
             .src_imm = null,
             .dst_mode = .DataRegDirect,
             .dst_reg = @as(u3, @truncate((opcode >> 9) & 0x7)),
+            .dst_imm = null,
             .disp = null,
             .condition = 0,
+            .reg_mask = 0,
+            .bf_offset = 0,
+            .bf_width = 0,
             .length = 2,
         };
     }
@@ -556,8 +582,12 @@ pub const Decoder = struct {
             .src_imm = @as(i32, @as(u3, @truncate((opcode >> 9) & 0x7))),
             .dst_mode = .DataRegDirect,
             .dst_reg = @as(u3, @truncate(opcode & 0x7)),
+            .dst_imm = null,
             .disp = null,
             .condition = 0,
+            .reg_mask = 0,
+            .bf_offset = 0,
+            .bf_width = 0,
             .length = 2,
         };
     }
@@ -571,8 +601,12 @@ pub const Decoder = struct {
             .src_imm = null,
             .dst_mode = .DataRegDirect,
             .dst_reg = @as(u3, @truncate((opcode >> 9) & 0x7)),
+            .dst_imm = null,
             .disp = null,
             .condition = 0,
+            .reg_mask = 0,
+            .bf_offset = 0,
+            .bf_width = 0,
             .length = 2,
         };
     }
@@ -586,8 +620,12 @@ pub const Decoder = struct {
             .src_imm = null,
             .dst_mode = .DataRegDirect,
             .dst_reg = 0,
+            .dst_imm = null,
             .disp = null,
             .condition = 0,
+            .reg_mask = 0,
+            .bf_offset = 0,
+            .bf_width = 0,
             .length = 2,
         };
     }
@@ -602,8 +640,12 @@ pub const Decoder = struct {
             .src_imm = null,
             .dst_mode = .DataRegDirect,
             .dst_reg = 0,
+            .dst_imm = null,
             .disp = null,
             .condition = 0,
+            .reg_mask = 0,
+            .bf_offset = 0,
+            .bf_width = 0,
             .length = 2,
         };
     }

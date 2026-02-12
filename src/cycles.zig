@@ -106,7 +106,16 @@ pub const CycleData = struct {
             .AddrRegIndirectPre => 6,   // -(An): 6 cycles
             .AddrRegDisp => 8,          // d16(An): 8 cycles
             .AddrRegIndex => 10,        // d8(An,Xn): 10 cycles
+            .AbsShort => 8,             // (xxx).W: 8 cycles
+            .AbsLong => 12,             // (xxx).L: 12 cycles
+            .PCDisp => 8,               // d16(PC): 8 cycles
+            .PCIndex => 10,             // d8(PC,Xn): 10 cycles
             .Immediate => 4,            // #<data>: 4 cycles
+            .MemoryIndirect => 14,      // (bd,An,Xn): 14 cycles (68020)
+            .PCMemoryIndirect => 14,    // (bd,PC,Xn): 14 cycles (68020)
+            .StatusReg => 0,            // SR: 0 cycles
+            .CCR => 0,                  // CCR: 0 cycles
+            .USP => 0,                  // USP: 0 cycles
         };
     }
     

@@ -356,7 +356,7 @@ pub const FunctionBuilder = struct {
         var v = value;
         var more = true;
         while (more) {
-            var byte = @as(u8, @truncate(v & 0x7F));
+            var byte = @as(u8, @truncate(@as(u32, @bitCast(v)) & 0x7F));
             v >>= 7;
             if ((v == 0 and (byte & 0x40) == 0) or (v == -1 and (byte & 0x40) != 0)) {
                 more = false;
